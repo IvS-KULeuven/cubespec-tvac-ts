@@ -1,0 +1,33 @@
+# Python versions and environment
+
+__pycache__
+.python-version
+.envrc
+
+# Build systems
+
+build
+dist
+**/*.egg-info
+
+# Apple specific
+
+.DS_Store
+
+# Unit testing
+
+.pytest_cache
+.coverage
+.coverage.*
+.nox
+htmlcov
+
+# Virtual environments
+
+.env
+.venv
+venv
+
+# PyCharm IDE
+
+.idea
