@@ -28,6 +28,9 @@ dependencies = [
     "pyqt5",
 ]
 
+[project.gui-scripts]
+tvac_ui = 'tvac.tasks.tvac.__init__:tvac_ui'
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/tvac"]
 
