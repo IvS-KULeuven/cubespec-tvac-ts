@@ -125,7 +125,7 @@ def print_heater_settings(heater_name: str, setup: Setup = None) -> None:
         print(f"Power supply to {heater_name} heater off -> No heat dissipation")
 
     else:
-        resistance = psu_setup.resistance  # R [Ohm]
+        resistance = psu_setup.heater.resistance  # R [Ohm]
 
         voltage = psu_device.get_voltage()  # [V]
         voltage_config = psu_device.get_voltage_config()  # [V]
