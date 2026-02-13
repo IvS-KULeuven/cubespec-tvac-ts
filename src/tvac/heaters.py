@@ -63,6 +63,12 @@ def config_psu(heater_name: str, dissipation: str, setup: Setup = None):
     ocp = math.sqrt(max_power / resistance)  # [Ohm]
     psu_device.set_ocp(ocp)
 
+    print(f"Power supply to {heater_name} heater ({resistance}Ω):")
+    print(f"Heat dissipation mode: {dissipation}")
+    print(f"Voltage: {voltage}V - configured: {voltage}V - OVP: {ovp}V")
+    print(f"Current: {current}A - configured: {current}A - OCP: {ocp}A")
+    print(f"-> Dissipating {voltage * current}")
+
     psu_device.set_output_status(IntSwitch.ON)
 
 
