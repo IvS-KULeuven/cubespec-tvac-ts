@@ -4,7 +4,7 @@ from egse.command import InvalidArgumentsError
 from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback
 
-from tvac.power_supply import config_psu, switch_off_psu, clear_psu_alarms, reset_psu
+from tvac.power_supply import config_psu, switch_off_psu, clear_psu_alarms
 from tvac.tasks.tvac.heaters import heaters, dissipation_modes, heaters_incl_all
 
 UI_MODULE_DISPLAY_NAME = "1 - Power supplies"
@@ -77,6 +77,7 @@ def switch_off_heater(heater: Callback(heaters_incl_all, name="Heater") = None) 
                 print(f"Failed to configure + switch on heater {heater_name}: {e}")
 
     # end_observation()
+
 
 @exec_ui(display_name="Clear alarms", use_kernel=True)
 def clear_alarms(heater: Callback(heaters, name="Heater") = None):

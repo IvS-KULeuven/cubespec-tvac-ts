@@ -2,28 +2,30 @@ from typing import List
 
 UI_TAB_DISPLAY_MODE = "Heaters"
 
+HEATERS = [
+    "HFGS",
+    "HDET",
+    "HDEL",
+    "HPCU",
+    "HADC",
+    "HACT",
+    "HSAG",
+    "HAV1",
+    "HAV2",
+    "HFSS",
+]
+
 
 def heaters() -> List[str]:
     """Names of the heaters.  Each of them has a dedicated Power Supply Unit."""
 
-    return [
-        "HFGS",
-        "HDET",
-        "HDEL",
-        "HPCU",
-        "HADC",
-        "HACT",
-        "HSAG",
-        "HAV1",
-        "HAV2",
-        "HFSS",
-    ]
+    return HEATERS
 
 
 def heaters_incl_all() -> List[str]:
     """Names of the heaters.  Each of them has a dedicated Power Supply Unit."""
 
-    return heaters() + ["All heaters"]
+    return HEATERS + ["All heaters"]
 
 
 def dissipation_modes() -> List[str]:

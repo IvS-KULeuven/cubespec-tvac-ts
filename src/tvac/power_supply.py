@@ -97,6 +97,7 @@ def switch_off_psu(heater_name: str, setup: Setup = None) -> None:
 
     psu_device.set_output_status(IntSwitch.OFF)
 
+
 def clear_psu_alarms(heater_name: str, setup: Setup = None) -> None:
     """Clears the alarms for the Power Supply Unit for the given heater.
 
@@ -121,6 +122,7 @@ def clear_psu_alarms(heater_name: str, setup: Setup = None) -> None:
     psu_device: PmxAInterface = psu_setup.device
 
     psu_device.clear_alarms()
+
 
 def reset_psu(heater_name: str, setup: Setup = None) -> None:
     """Resets the Power Supply Unit for the given heater.
