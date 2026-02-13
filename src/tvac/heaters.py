@@ -29,7 +29,7 @@ def config_psu(heater_name: str, dissipation: str, setup: Setup = None):
     if not psu_setup:
         raise InvalidArgumentsError(f"No heater {heater_name} found in the setup")
 
-    psu_device: PmxAInterface = psu_setup.device()
+    psu_device: PmxAInterface = psu_setup.device
 
     resistance = psu_setup.heater.resistance  # R [Ohm]
     power = 0  # P [W]
@@ -87,7 +87,7 @@ def switch_off_psu(heater_name: str, setup: Setup = None):
     if not psu_setup:
         raise InvalidArgumentsError(f"No heater {heater_name} found in the setup")
 
-    psu_device: PmxAInterface = psu_setup.device()
+    psu_device: PmxAInterface = psu_setup.device
 
     psu_device.set_output_status(IntSwitch.OFF)
 
@@ -113,7 +113,7 @@ def print_heater_settings(heater_name: str, setup: Setup = None) -> None:
     if not psu_setup:
         raise InvalidArgumentsError(f"No heater {heater_name} found in the setup")
 
-    psu_device: PmxAInterface = psu_setup.device()
+    psu_device: PmxAInterface = psu_setup.device
 
     if psu_device.get_output_status():
         print(f"Power supply to {heater_name} heater off -> No heat dissipation")
