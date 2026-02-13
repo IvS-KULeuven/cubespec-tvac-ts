@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from egse.command import InvalidArgumentsError
 from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback
 
@@ -30,7 +29,7 @@ def switch_on_heater(
 
         try:
             config_psu(heater_name=heater, dissipation=dissipation)
-        except RuntimeError | InvalidArgumentsError | AttributeError as e:
+        except Exception as e:
             print(f"Failed to configure + switch on heater {heater}: {e}")
 
     else:
@@ -39,7 +38,7 @@ def switch_on_heater(
         for heater_name in heaters():
             try:
                 config_psu(heater_name=heater_name, dissipation=dissipation)
-            except RuntimeError | InvalidArgumentsError | AttributeError as e:
+            except Exception as e:
                 print(f"Failed to configure + switch on heater {heater_name}: {e}")
 
     # end_observation()
@@ -64,7 +63,7 @@ def switch_off_heater(heater: Callback(heaters_incl_all, name="Heater") = None) 
 
         try:
             switch_off_psu(heater_name=heater)
-        except RuntimeError | InvalidArgumentsError | AttributeError as e:
+        except Exception as e:
             print(f"Failed to configure + switch on heater {heater}: {e}")
 
     else:
@@ -73,7 +72,7 @@ def switch_off_heater(heater: Callback(heaters_incl_all, name="Heater") = None) 
         for heater_name in heaters():
             try:
                 switch_off_psu(heater_name=heater)
-            except RuntimeError | InvalidArgumentsError | AttributeError as e:
+            except Exception as e:
                 print(f"Failed to configure + switch on heater {heater_name}: {e}")
 
     # end_observation()
@@ -89,7 +88,7 @@ def clear_alarms(heater: Callback(heaters, name="Heater") = None):
 
     try:
         clear_psu_alarms(heater_name=heater)
-    except RuntimeError | InvalidArgumentsError | AttributeError as e:
+    except Exception as e:
         print(f"Failed to clear alarms for heater {heater}: {e}")
 
 
@@ -103,5 +102,5 @@ def reset(heater: Callback(heaters, name="Heater") = None):
 
     try:
         clear_psu_alarms(heater_name=heater)
-    except RuntimeError | InvalidArgumentsError | AttributeError as e:
+    except Exception as e:
         print(f"Failed to reset Power Supply Unit for heater {heater}: {e}")
