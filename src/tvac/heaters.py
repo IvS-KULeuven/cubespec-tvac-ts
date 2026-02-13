@@ -121,7 +121,7 @@ def print_heater_settings(heater_name: str, setup: Setup = None) -> None:
 
     psu_device: PmxAInterface = psu_setup.device
 
-    if psu_device.get_output_status():
+    if not psu_device.get_output_status():
         print(f"Power supply to {heater_name} heater off -> No heat dissipation")
 
     else:
