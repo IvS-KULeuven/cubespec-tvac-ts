@@ -26,7 +26,11 @@ dependencies = [
     "kikusui-power-supply",
     "gui-executor",
     "pyqt5",
+    "pytz",
 ]
+
+[project.gui-scripts]
+tvac_ui = 'tvac.tasks.tvac.__init__:tvac_ui'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tvac"]
