@@ -26,6 +26,7 @@ dependencies = [
     "kikusui-power-supply",
     "gui-executor",
     "pyqt5",
+    "pytz",
 ]
 
 [project.gui-scripts]
