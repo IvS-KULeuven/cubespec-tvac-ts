@@ -46,6 +46,29 @@ _runtime_overrides: dict[str, dict[str, object]] = {
 _runtime_channel_overrides: dict[str, dict[str, object]] = {}
 _active_channel_labels: list[str] = []
 _cached_channel_names: list[str] = ["SG_AIN0", "SG_AIN2", "SG_AIN4"]
+_cached_channel_settings: dict[str, dict[str, object]] = {
+    "SG_AIN0": {
+        "enabled": True,
+        "ain_channel": 0,
+        "voltage_range": 0.1,
+        "neg_voltage_range": 10.0,
+        "resolution_index": 0,
+    },
+    "SG_AIN2": {
+        "enabled": True,
+        "ain_channel": 2,
+        "voltage_range": 0.1,
+        "neg_voltage_range": 10.0,
+        "resolution_index": 0,
+    },
+    "SG_AIN4": {
+        "enabled": True,
+        "ain_channel": 4,
+        "voltage_range": 0.1,
+        "neg_voltage_range": 10.0,
+        "resolution_index": 0,
+    },
+}
 
 # Plot buffers (shared with any live-plot consumer)
 plot_lock = threading.Lock()
@@ -112,7 +135,7 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
 
 
 def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
-    global _cached_channel_names
+    global _cached_channel_names, _cached_channel_settings
     cfg = setup.gse.labjack_t7
     channels: dict[str, dict[str, object]] = {}
     for sg_name in cfg.channels:
@@ -126,6 +149,7 @@ def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
         }
     if channels:
         _cached_channel_names = list(channels.keys())
+        _cached_channel_settings = {name: dict(values) for name, values in channels.items()}
     return channels
 
 
@@ -163,6 +187,15 @@ def get_sg_channel_names(setup: Setup = None) -> list[str]:
 def get_cached_sg_channel_names() -> list[str]:
     """Return cached SG channel names without accessing setup storage."""
     return list(_cached_channel_names)
+
+
+def get_cached_sg_channel_settings() -> dict[str, dict[str, object]]:
+    """Return cached SG channel settings with runtime overrides applied."""
+    settings = {name: dict(values) for name, values in _cached_channel_settings.items()}
+    for sg_name, overrides in _runtime_channel_overrides.items():
+        if sg_name in settings:
+            settings[sg_name].update(overrides)
+    return settings
 
 
 def set_sg_runtime_settings(
@@ -240,11 +273,13 @@ def set_sg_channel_runtime_settings(
 ) -> None:
     """Set in-memory runtime overrides for one SG channel definition."""
     setup = setup or load_setup_from_disk(None)
-    valid_names = _snapshot_setup_channels(setup).keys()
+    channels = _snapshot_setup_channels(setup)
+    valid_names = channels.keys()
     if sg_name not in valid_names:
         known = ", ".join(valid_names)
         raise ValueError(f"Unknown sg_name '{sg_name}'. Known SGs: {known}")
 
+    _cached_channel_settings[sg_name] = dict(channels[sg_name])
     overrides = _runtime_channel_overrides.setdefault(sg_name, {})
 
     if enabled is not None:
@@ -263,6 +298,7 @@ def set_sg_channel_runtime_settings(
         overrides["resolution_index"] = _coerce_non_negative_int(
             resolution_index, "resolution_index"
         )
+    _cached_channel_settings[sg_name].update(overrides)
 
 
 def reset_sg_runtime_settings() -> None:
@@ -270,6 +306,10 @@ def reset_sg_runtime_settings() -> None:
     for section in _runtime_overrides.values():
         section.clear()
     _runtime_channel_overrides.clear()
+    try:
+        _snapshot_setup_channels(load_setup_from_disk(None))
+    except Exception:
+        pass
 
 
 def get_sg_settings(setup: Setup = None) -> str:

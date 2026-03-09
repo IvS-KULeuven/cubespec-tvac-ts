@@ -1,11 +1,12 @@
 from pathlib import Path
 
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QHBoxLayout
 from egse.setup import load_setup_from_disk
 from gui_executor.exec import exec_ui
-from gui_executor.utypes import Callback
+from gui_executor.utypes import TypeObject, UQWidget
 
 from tvac.strain_gauge import (
-    get_cached_sg_channel_names,
+    get_cached_sg_channel_settings,
     get_sg_channel_names,
     get_sg_effective_settings,
     get_sg_settings,
@@ -20,43 +21,93 @@ from tvac.strain_gauge import (
 UI_MODULE_DISPLAY_NAME = "1 - Strain Gauges"
 HERE = Path(__file__).parent.parent.resolve()
 ICON_PATH = HERE / "icons/"
-_SG_NAME_OPTIONS: list[str] = []
+
+_AIN_OPTIONS = list(range(14))
+_VOLTAGE_RANGE_OPTIONS = [10.0, 1.0, 0.1, 0.01]
+_RESOLUTION_INDEX_OPTIONS = list(range(9))
 
 
-def _sg_name_options() -> list[str]:
-    global _SG_NAME_OPTIONS
-
-    if _SG_NAME_OPTIONS:
-        return _SG_NAME_OPTIONS
-
-    # Keep this callback I/O-free; GUI builds argument panels on the UI thread.
-    _SG_NAME_OPTIONS = get_cached_sg_channel_names() or ["SG_AIN0"]
-
-    return _SG_NAME_OPTIONS
+def _set_combo_value(combo: QComboBox, value) -> None:
+    idx = combo.findText(str(value))
+    if idx >= 0:
+        combo.setCurrentIndex(idx)
 
 
-def _ain_channel_options() -> list[int]:
-    return list(range(14))
+def _fallback_ain_channel(name: str) -> int:
+    if "AIN" not in name:
+        return 0
+    try:
+        return int(name.split("AIN", maxsplit=1)[1])
+    except ValueError:
+        return 0
 
 
-def _ain_channel_default() -> int:
-    return 0
+class SGChannelConfig(TypeObject):
+    def __init__(self, name: str = "SG channel"):
+        super().__init__(name=name)
+
+    def get_widget(self):
+        return SGChannelConfigWidget()
 
 
-def _voltage_range_options() -> list[float]:
-    return [10.0, 1.0, 0.1, 0.01]
+class SGChannelConfigWidget(UQWidget):
+    def __init__(self):
+        super().__init__()
 
+        self._channel_settings = get_cached_sg_channel_settings()
+        if not self._channel_settings:
+            self._channel_settings = {
+                "SG_AIN0": {
+                    "enabled": True,
+                    "ain_channel": 0,
+                    "voltage_range": 0.1,
+                    "resolution_index": 0,
+                }
+            }
 
-def _voltage_range_default() -> float:
-    return 0.1
+        self.sg_combo = QComboBox()
+        self.sg_combo.addItems(self._channel_settings.keys())
 
+        self.enabled_cb = QCheckBox("enabled")
+        self.ain_combo = QComboBox()
+        self.ain_combo.addItems(str(v) for v in _AIN_OPTIONS)
+        self.voltage_combo = QComboBox()
+        self.voltage_combo.addItems(str(v) for v in _VOLTAGE_RANGE_OPTIONS)
+        self.resolution_combo = QComboBox()
+        self.resolution_combo.addItems(str(v) for v in _RESOLUTION_INDEX_OPTIONS)
 
-def _resolution_index_options() -> list[int]:
-    return list(range(9))
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.sg_combo)
+        layout.addWidget(self.enabled_cb)
+        layout.addWidget(self.ain_combo)
+        layout.addWidget(self.voltage_combo)
+        layout.addWidget(self.resolution_combo)
+        self.setLayout(layout)
 
+        self.sg_combo.currentTextChanged.connect(self._apply_channel_defaults)
+        self._apply_channel_defaults(self.sg_combo.currentText())
 
-def _resolution_index_default() -> int:
-    return 0
+    def _apply_channel_defaults(self, sg_name: str):
+        defaults = self._channel_settings.get(sg_name, {})
+        ain_channel = int(defaults.get("ain_channel", _fallback_ain_channel(sg_name)))
+        voltage_range = float(defaults.get("voltage_range", 0.1))
+        resolution_index = int(defaults.get("resolution_index", 0))
+        enabled = bool(defaults.get("enabled", True))
+
+        self.enabled_cb.setChecked(enabled)
+        _set_combo_value(self.ain_combo, ain_channel)
+        _set_combo_value(self.voltage_combo, voltage_range)
+        _set_combo_value(self.resolution_combo, resolution_index)
+
+    def get_value(self):
+        return {
+            "sg_name": self.sg_combo.currentText(),
+            "enabled": self.enabled_cb.isChecked(),
+            "ain_channel": int(self.ain_combo.currentText()),
+            "voltage_range": float(self.voltage_combo.currentText()),
+            "resolution_index": int(self.resolution_combo.currentText()),
+        }
 
 
 @exec_ui(display_name="Query Settings", use_kernel=True)
@@ -67,15 +118,12 @@ def settings() -> None:
 
 @exec_ui(display_name="Configure SG channel", use_kernel=True)
 def configure_sg_channel(
-    sg_name: Callback(_sg_name_options, name="SG name") = None,
-    enabled: bool = True,
-    ain_channel: Callback(_ain_channel_options, default=_ain_channel_default, name="AIN channel") = None,
-    voltage_range: Callback(_voltage_range_options, default=_voltage_range_default, name="Voltage range [V]") = None,
-    resolution_index: Callback(_resolution_index_options, default=_resolution_index_default, name="Resolution index") = None,
+    config: SGChannelConfig(name="SG / AIN / Range / Resolution") = None,
 ) -> None:
     """Set runtime overrides for one SG channel (applied on next Start logging)."""
     try:
-        name = sg_name.strip()
+        cfg = config or {}
+        name = str(cfg.get("sg_name", "")).strip()
         if not name:
             available = get_sg_channel_names()
             if not available:
@@ -85,10 +133,10 @@ def configure_sg_channel(
 
         set_sg_channel_runtime_settings(
             sg_name=name,
-            enabled=enabled,
-            ain_channel=ain_channel,
-            voltage_range=voltage_range,
-            resolution_index=resolution_index,
+            enabled=bool(cfg.get("enabled", True)),
+            ain_channel=int(cfg.get("ain_channel", 0)),
+            voltage_range=float(cfg.get("voltage_range", 0.1)),
+            resolution_index=int(cfg.get("resolution_index", 0)),
         )
         print(f"Runtime channel settings updated for {name}.")
         print(get_sg_settings())
