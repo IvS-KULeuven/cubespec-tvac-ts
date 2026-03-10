@@ -11,9 +11,11 @@ UI_MODULE_DISPLAY_NAME = "1 - Wave generators"
 HERE = Path(__file__).parent.parent.resolve()
 ICON_PATH = HERE / "icons/"
 
+
 @exec_ui(display_name="Test", use_kernel=True)
 def print_test():
     print("Test")
+
 
 # @exec_ui(display_name="Configuration & switch-on", use_kernel=True)
 # def switch_on_piezos(profile: Callback(profiles, name="Voltage profile") = None
@@ -40,5 +42,3 @@ def print_test():
 #     """Switches off the Wave Generators."""
 #
 #     pass
-
-
