@@ -98,9 +98,9 @@ class LabJackT7Logger:
 
         Reads all parameters from ``setup.gse.labjack_t7``.
         """
-        from egse.setup import load_setup_from_disk
+        from egse.setup import load_setup
 
-        setup = setup or load_setup_from_disk(None)
+        setup = setup or load_setup()
         cfg = setup.gse.labjack_t7
 
         # Build per-channel lists from the channels dict
