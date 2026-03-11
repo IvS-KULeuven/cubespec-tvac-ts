@@ -50,24 +50,32 @@ $ uv venv --python 3.11
 $ uv sync
 ```
 
-The CGSE framework requires a set of environment variables. Add these to a local `.env` file and 
-load them to your terminal (`export $(cat .env | xargs)`):
+The CGSE framework requires a set of environment variables. Add these to a local `.env` file and
+load them in the shell from which you will start the CGSE services and `tvac_ui`:
 
 ```bash
 export PROJECT=CUBESPEC
 export SITE_ID=KUL
 
-export CUBESPEC_LOCAL_SETTINGS=../cubespec-tvac-conf/data/KUL/conf/SETUP_KUL_00001_260206_105400.yaml 
+export CUBESPEC_LOCAL_SETTINGS=../cubespec-tvac-conf/data/KUL/conf/SETUP_KUL_00001_260206_105400.yaml
 export CUBESPEC_DATA_STORAGE_LOCATION=~/data/CUBESPEC/KUL
-export CUBESPEC_CONF_DATA_LOCATION=../cubespec-tvac-conf/data/KUL/conf
+export CUBESPEC_CONF_DATA_LOCATION=~/cubespec-tvac-conf/data/KUL/conf
 export CUBESPEC_LOG_FILE_LOCATION=~/data/CUBESPEC/KUL/log
+```
+
+```bash
+set -a
+source .env
+set +a
 ```
 
 `CUBESPEC_CONF_DATA_LOCATION` must point to the directory containing the `SETUP_KUL_*.yaml` files in the conf repo.
 
-Create the data and log directories:
+Create the data and log directories expected by the Storage Manager:
 
 ```bash
+mkdir -p ~/data/CUBESPEC/KUL/daily
+mkdir -p ~/data/CUBESPEC/KUL/obs
 mkdir -p ~/data/CUBESPEC/KUL/log
 ```
 
@@ -79,21 +87,53 @@ uv sync          # or: pip install -e .
 
 ## Usage
 
+### Start CGSE core services
+
+When `cgse-core` is installed, `load_setup()` uses the Configuration Manager by default. That means
+`tvac_ui` expects the CGSE core services to be running and a Setup to be loaded on the Configuration
+Manager before you start the GUI.
+
+Start the core services:
+
+```bash
+uv run cgse core start
+uv run cgse core status
+```
+
+If the Storage Manager or Configuration Manager is not active, check that:
+
+- the shell used to start the services has the environment variables from `.env` loaded;
+- `CUBESPEC_DATA_STORAGE_LOCATION` exists and contains `daily/`, `obs/`, and `log/`;
+- `CUBESPEC_CONF_DATA_LOCATION` points to the directory containing the `SETUP_KUL_*.yaml` files.
+
+List the available Setups and load the one you want on the Configuration Manager:
+
+```bash
+uv run cm_cs list-setups
+uv run cm_cs load-setup 1
+uv run cgse cm status
+```
+
+In the current KUL test configuration:
+
+- Setup `0` is the initial setup
+- Setup `1` is the full setup with PSUs, DAQ6510, and LabJack T7
+
 ### GUI
 
 ```bash
-tvac_ui
+uv run tvac_ui
 ```
 
 ### Interactive session
 
 ```bash
-PYTHONSTARTUP=startup.py python
+PYTHONSTARTUP=startup.py uv run python
 ```
 
 ```python
 from egse.setup import load_setup
-setup = load_setup()       # loads the latest SETUP_KUL_*.yaml
+setup = load_setup()       # loads the Setup currently active on the Configuration Manager
 
 from tvac.strain_gauge import start_sg_logging, stop_sg_logging
 start_sg_logging(setup=setup)
