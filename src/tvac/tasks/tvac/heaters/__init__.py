@@ -1,31 +1,36 @@
 from typing import List
 
+from egse.setup import load_setup
+
 UI_TAB_DISPLAY_NAME = "Heaters"
 
-HEATERS = [
-    "HFGS",
-    "HDET",
-    "HDEL",
-    "HPCU",
-    "HADC",
-    "HACT",
-    "HSAG",
-    "HAV1",
-    "HAV2",
-    "HFSS",
-]
 
 
 def heaters() -> List[str]:
     """Names of the heaters.  Each of them has a dedicated Power Supply Unit."""
 
-    return HEATERS
+    heater_list = []
+
+    setup = load_setup()
+
+    for _, psu in setup.gse.power_supply.items():
+        heater_list.append(psu.heater.name)
+
+    return heater_list
+
 
 
 def heaters_incl_all() -> List[str]:
     """Names of the heaters.  Each of them has a dedicated Power Supply Unit."""
 
-    return ["All heaters"] + HEATERS
+    heater_list = ["All heaters"]
+
+    setup = load_setup()
+
+    for _, psu in setup.gse.power_supply.items():
+        heater_list.append(psu.heater.name)
+
+    return heater_list
 
 
 def dissipation_modes() -> List[str]:
