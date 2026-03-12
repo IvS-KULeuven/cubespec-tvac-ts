@@ -1,8 +1,20 @@
-"""
-High-level strain-gauge logging functions.
+"""High-level strain-gauge session management and data fan-out.
 
-Reads LabJack T7 and CSV configuration from the CGSE Setup, mirrors
-the pattern of ``tvac.power_supply`` for heaters.
+This module sits one layer above :mod:`tvac.labjack_t7`.
+
+Its responsibilities are:
+
+1. read the strain-gauge configuration from the active CGSE setup,
+2. apply in-memory runtime overrides from the GUI,
+3. start and stop the :class:`tvac.labjack_t7.LabJackT7Logger`,
+4. receive streamed batches through a callback,
+5. write CSV output, and
+6. maintain bounded in-memory plot buffers for the live plot window.
+
+The module keeps the current session state in module-level globals because the
+GUI tasks interact with it procedurally: ``start`` creates the singleton-like
+streaming session, ``stop`` tears it down, and the plot window reads shared
+buffers while the session is active.
 """
 
 import bisect
@@ -19,6 +31,9 @@ from egse.setup import Setup, load_setup
 # ---------------------------------------------------------------------------
 # Module-level state for the active logging session
 # ---------------------------------------------------------------------------
+# The strain-gauge GUI operates as a small state machine around a single
+# streaming session. These globals represent that session and are protected
+# by locks where they may be touched from multiple threads/callbacks.
 _logger = None  # LabJackT7Logger, imported lazily to avoid LJM init on import
 _session_lock = threading.RLock()
 _csv_lock = threading.Lock()
@@ -80,6 +95,7 @@ ch_buffers: list[list[float]] = []
 
 
 def _sg_debug(message: str) -> None:
+    """Emit opt-in debug logging for SG internals when enabled via env var."""
     if not os.environ.get("TVAC_SG_DEBUG", "").strip():
         return
 
@@ -124,7 +140,12 @@ def _coerce_positive_float(value, field_name: str) -> float:
 
 
 def _resolve_csv_save_path(path: str) -> str:
-    """Resolve SG CSV output paths relative to the CGSE daily data directory."""
+    """Resolve SG CSV output paths relative to the CGSE daily data directory.
+
+    Setup files currently use relative paths such as ``.``. For the strain
+    gauge logger that means "store next to the CGSE daily data" rather than
+    "store in the current process working directory".
+    """
     candidate = Path(path).expanduser()
     if candidate.is_absolute():
         return str(candidate)
@@ -140,6 +161,7 @@ def _resolve_csv_save_path(path: str) -> str:
 
 
 def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
+    """Capture non-channel SG settings from the setup into plain Python data."""
     cfg = setup.gse.labjack_t7
     return {
         "stream": {
@@ -163,6 +185,7 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
 
 
 def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
+    """Capture SG channel definitions from the setup and refresh local caches."""
     global _cached_channel_names, _cached_channel_settings
     cfg = setup.gse.labjack_t7
     channels: dict[str, dict[str, object]] = {}
@@ -182,6 +205,7 @@ def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
 
 
 def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]:
+    """Return setup-derived stream/CSV/plot settings with runtime overrides."""
     setup = setup or load_setup()
     effective = _snapshot_setup_cfg(setup)
     for section_name, overrides in _runtime_overrides.items():
@@ -190,6 +214,7 @@ def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]
 
 
 def _get_effective_channel_settings(setup: Setup = None) -> dict[str, dict[str, object]]:
+    """Return setup-derived channel settings with per-channel overrides applied."""
     setup = setup or load_setup()
     effective = _snapshot_setup_channels(setup)
     for sg_name, overrides in _runtime_channel_overrides.items():
@@ -218,7 +243,12 @@ def get_cached_sg_channel_names() -> list[str]:
 
 
 def get_cached_sg_channel_settings() -> dict[str, dict[str, object]]:
-    """Return cached SG channel settings with runtime overrides applied."""
+    """Return GUI-safe cached channel settings with runtime overrides applied.
+
+    The GUI process may need to populate widgets without reloading the setup
+    file every time. This cache tracks the latest setup snapshot plus any
+    in-memory overrides applied during the current process lifetime.
+    """
     settings = {name: dict(values) for name, values in _cached_channel_settings.items()}
     for sg_name, overrides in _runtime_channel_overrides.items():
         if sg_name in settings:
@@ -240,7 +270,11 @@ def set_sg_runtime_settings(
     plot_interval_ms=None,
     plot_show_stats=None,
 ) -> None:
-    """Set in-memory SG runtime overrides for the next logging session."""
+    """Set in-memory SG runtime overrides for the next logging session.
+
+    These overrides do not edit the setup file. They only affect the effective
+    settings used by a future ``start_sg_logging()`` call.
+    """
     if scan_rate is not None:
         _runtime_overrides["stream"]["scan_rate"] = _coerce_positive_float(
             scan_rate, "scan_rate"
@@ -299,7 +333,13 @@ def set_sg_channel_runtime_settings(
     resolution_index=None,
     setup: Setup = None,
 ) -> None:
-    """Set in-memory runtime overrides for one SG channel definition."""
+    """Set in-memory runtime overrides for one SG channel definition.
+
+    The override model mirrors the GUI behavior: users can temporarily change
+    channel enable flags or acquisition parameters, inspect the effective
+    result, and then start a session without persisting those changes back to
+    the setup repository.
+    """
     setup = setup or load_setup()
     channels = _snapshot_setup_channels(setup)
     valid_names = channels.keys()
@@ -330,7 +370,10 @@ def set_sg_channel_runtime_settings(
 
 
 def reset_sg_runtime_settings() -> None:
-    """Clear all in-memory SG runtime overrides."""
+    """Clear all in-memory SG runtime overrides.
+
+    After reset, newly started sessions will use the setup values again.
+    """
     for section in _runtime_overrides.values():
         section.clear()
     _runtime_channel_overrides.clear()
@@ -409,6 +452,7 @@ def get_sg_settings(setup: Setup = None) -> str:
 
 
 def _rotate_csv(headers):
+    """Open the next CSV file segment and write the header row."""
     global _file_index, _csv_file, _csv_writer, _csv_filename
 
     if _csv_file:
@@ -423,12 +467,25 @@ def _rotate_csv(headers):
 
 
 def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_backlog):
+    """Process one streamed batch from :class:`LabJackT7Logger`.
+
+    This callback is the central fan-out point of the SG data flow:
+
+    1. receive timestamped scan rows from the LabJack logger,
+    2. append them to the current CSV file and rotate files when needed,
+    3. update the shared live-plot buffers.
+
+    The callback does not talk to the GUI directly. The live plot reads the
+    shared ``time_buffer`` and ``ch_buffers`` data structures independently.
+    """
     global _read_count, _csv_writer, _csv_file, _csv_filename
 
     if not timestamps or not readings:
         return
 
     with _session_lock:
+        # Copy session state under lock so the rest of the callback can operate
+        # without holding the session lock around file I/O or buffer work.
         csv_enabled = _csv_enabled
         plot_enabled = _plot_enabled
         plot_keep_seconds = _plot_keep_seconds
@@ -439,6 +496,8 @@ def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_
             if _csv_writer is None:
                 _rotate_csv(channel_names)
 
+            # The logger already grouped raw stream values into per-scan rows.
+            # CSV output therefore becomes a simple row-wise append.
             rows = [
                 [ts.isoformat()] + list(row)
                 for ts, row in zip(timestamps, readings)
@@ -460,6 +519,8 @@ def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_
         if logger is None or logger.stream_start_time is None:
             return
 
+        # The live plot uses seconds-from-start on the x-axis instead of raw
+        # datetimes, so convert timestamps into offsets from the stream start.
         t0 = logger.stream_start_time
         new_times = [(ts - t0).total_seconds() for ts in timestamps]
         new_vals = list(zip(*readings))
@@ -482,8 +543,14 @@ def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_
 def start_sg_logging(setup: Setup = None):
     """Start strain-gauge streaming and CSV logging from the CGSE Setup.
 
-    Reads all LabJack T7 channel, stream, and CSV parameters from
-    ``setup.gse.labjack_t7``.
+    The startup sequence is:
+
+    1. load setup values,
+    2. merge any in-memory runtime overrides,
+    3. validate the enabled channel set,
+    4. initialise CSV / plot session state,
+    5. create the LabJack logger,
+    6. start the stream so data begins arriving through ``_on_stream_data``.
     """
     global _logger, _csv_enabled, _save_path, _base_filename, _max_file_size
     global _plot_enabled, _plot_keep_seconds, _start_ts
@@ -501,8 +568,9 @@ def start_sg_logging(setup: Setup = None):
     if not selected_channels:
         raise ValueError("No SG channels are enabled. Enable at least one channel first.")
 
+    # Flatten the enabled channel mapping into the parallel lists expected by
+    # LabJackT7Logger and the plot buffers.
     n_ch = len(selected_channels)
-
     ain_channels = []
     voltage_ranges = []
     neg_voltage_ranges = []
@@ -525,6 +593,8 @@ def start_sg_logging(setup: Setup = None):
             print("Strain-gauge logging is already running.")
             return
 
+        # Session settings are copied into module-level state so the callback
+        # can operate without repeatedly consulting setup objects.
         _csv_enabled = bool(effective["csv"]["enabled"])
         _save_path = _resolve_csv_save_path(str(effective["csv"]["save_path"]))
         _base_filename = str(effective["csv"]["base_filename"])
@@ -558,6 +628,8 @@ def start_sg_logging(setup: Setup = None):
         logger = _logger
 
     with plot_lock:
+        # One buffer per enabled channel, aligned with the order used by the
+        # LabJack stream and CSV output.
         time_buffer.clear()
         ch_buffers.clear()
         ch_buffers.extend([] for _ in range(n_ch))
@@ -584,7 +656,7 @@ def start_sg_logging(setup: Setup = None):
 
 
 def stop_sg_logging():
-    """Stop the active strain-gauge logging session."""
+    """Stop the active strain-gauge logging session and release resources."""
     global _logger, _csv_file, _csv_filename, _csv_writer, _active_channel_labels
 
     with _session_lock:
@@ -598,6 +670,8 @@ def stop_sg_logging():
     try:
         logger.close()
     finally:
+        # Tear down each output path even if the device close raised, so the
+        # next start begins from a clean session state.
         with _session_lock:
             if _logger is logger:
                 _logger = None
@@ -618,7 +692,7 @@ def stop_sg_logging():
 
 
 def get_sg_status() -> str:
-    """Return a short status string for the current logging session."""
+    """Return a short human-readable status string for the current session."""
     with _session_lock:
         logger = _logger
         channels = (
@@ -637,7 +711,11 @@ def get_sg_status() -> str:
 
 
 def trim_plot_buffers(keep_seconds: float):
-    """Remove plot-buffer samples older than *keep_seconds* from the latest."""
+    """Remove plot-buffer samples older than ``keep_seconds`` from the latest.
+
+    This helper is used by the plotting layer when it wants tighter control
+    over memory than the default bounded-buffer logic inside ``_on_stream_data``.
+    """
     with plot_lock:
         if not time_buffer:
             return

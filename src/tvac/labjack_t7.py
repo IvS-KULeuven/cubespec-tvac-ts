@@ -1,9 +1,16 @@
-"""
-LabJack T7 strain-gauge streaming class.
+"""LabJack T7 streaming support for the strain-gauge feature.
 
-Handles device connection, differential channel configuration, and
-callback-driven streaming. CSV writing or other data handling is
-delegated to a user-supplied callback.
+This module is intentionally narrow in scope:
+
+1. connect to a single T7 over USB,
+2. configure the requested analog input channels for differential reads,
+3. start continuous streaming, and
+4. translate each raw stream batch into timestamped scans before handing
+   the data to a caller-supplied callback.
+
+It does not know anything about CSV files, plotting, or GUI state. Those
+concerns live in :mod:`tvac.strain_gauge`, which owns the higher-level
+session lifecycle and output handling.
 """
 
 import datetime
@@ -36,11 +43,18 @@ class LabJackT7Logger:
         Seconds between host-clock re-anchor points to limit drift.
     buffer_size : int
         T7 stream buffer size in bytes (max 32768).
+
+    Notes
+    -----
+    The logger exposes batches of scans through a callback instead of
+    returning data directly. This mirrors how the LabJack LJM API delivers
+    stream reads and keeps device I/O separate from downstream consumers
+    such as the CSV writer and live plot.
     """
 
     @staticmethod
     def _expand(value, n, label):
-        """Accept a scalar or list; return a list of length *n*."""
+        """Normalize scalar or per-channel input to a list of length ``n``."""
         if isinstance(value, (list, tuple)):
             if len(value) != n:
                 raise ValueError(
@@ -96,7 +110,9 @@ class LabJackT7Logger:
     def from_setup(cls, setup=None):
         """Construct a LabJackT7Logger from a CGSE Setup object.
 
-        Reads all parameters from ``setup.gse.labjack_t7``.
+        Reads channel wiring and stream parameters from
+        ``setup.gse.labjack_t7`` and expands them into the per-channel lists
+        expected by :class:`LabJackT7Logger`.
         """
         from egse.setup import load_setup
 
@@ -130,17 +146,21 @@ class LabJackT7Logger:
 
     @property
     def handle(self):
+        """Return the active LJM device handle, or ``None`` if closed."""
         return self._handle
 
     @property
     def actual_scan_rate(self):
+        """Return the actual scan rate negotiated with the device."""
         return self._actual_scan_rate
 
     @property
     def stream_start_time(self):
+        """Return the host timestamp used as the stream time origin."""
         return self._stream_start_time
 
     def _connect(self):
+        """Open the LabJack and verify that the detected device is a T7."""
         try:
             self._handle = ljm.openS("T7", "USB", "ANY")
         except LJMError as e:
@@ -157,9 +177,12 @@ class LabJackT7Logger:
         )
 
     def _configure(self):
+        """Write per-channel differential and stream-wide configuration."""
         names = []
         values = []
 
+        # Each positive channel is read differentially against the next AIN
+        # input. For example AIN0 uses AIN1 as the negative reference.
         for ch, neg_ch in zip(self.ain_channels, self.neg_channels):
             names.append(f"AIN{ch}_NEGATIVE_CH")
             values.append(neg_ch)
@@ -200,6 +223,13 @@ class LabJackT7Logger:
             print(f"    {n} : {v}")
 
     def _stream_callback(self, handle):
+        """Handle one asynchronous LJM stream-read callback.
+
+        The LabJack returns a flat list of interleaved channel samples. This
+        callback groups the raw values back into per-scan rows, synthesizes a
+        timestamp for each scan from the current host-time anchor, and then
+        forwards the batch to the caller-supplied callback.
+        """
         if handle != self._handle or not self._streaming:
             return
 
@@ -210,6 +240,8 @@ class LabJackT7Logger:
                 return
             raise
 
+        # LJM returns one flat vector of values ordered by scan:
+        # [scan0_ch0, scan0_ch1, ..., scan1_ch0, scan1_ch1, ...]
         raw_data = ret[0]
         device_backlog = ret[1]
         ljm_backlog = ret[2]
@@ -229,7 +261,9 @@ class LabJackT7Logger:
                 readings.append(raw_data[i : i + self.num_addresses])
                 self._scan_index += 1
 
-            # Re-anchor between batches
+            # The T7 does not provide a per-scan host timestamp. We therefore
+            # derive timestamps from the negotiated scan rate and periodically
+            # re-anchor to the current host clock to limit long-run drift.
             if (self._scan_index - self._anchor_scan_count) >= self._resync_interval_scans:
                 self._t_anchor = datetime.datetime.now()
                 self._anchor_scan_count = self._scan_index
@@ -256,6 +290,12 @@ class LabJackT7Logger:
                 channel_names : list[str]
                 device_backlog: int
                 ljm_backlog   : int
+
+        Notes
+        -----
+        The actual scan rate may differ slightly from the requested value.
+        ``self.actual_scan_rate`` is populated from :func:`ljm.eStreamStart`
+        and is later used to derive scan timestamps.
         """
         self._callback = callback
 
@@ -280,6 +320,7 @@ class LabJackT7Logger:
         )
 
     def stop_stream(self):
+        """Stop the active LabJack stream if one is running."""
         self._streaming = False
         try:
             ljm.eStreamStop(self._handle)
@@ -288,6 +329,7 @@ class LabJackT7Logger:
         print("Stream stopped.")
 
     def close(self):
+        """Stop streaming and close the LabJack device handle."""
         self.stop_stream()
         if self._handle is not None:
             ljm.close(self._handle)
