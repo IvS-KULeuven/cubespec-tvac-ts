@@ -5,15 +5,15 @@ from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback
 
 from tvac.tasks.tvac.piezos import profiles
-from tvac.wave_generators import config_awg
+from tvac.wave_generation import config_awg
 
-UI_MODULE_DISPLAY_NAME = "1 - Wave generators"
+UI_MODULE_DISPLAY_NAME = "2 - Profiles"
 HERE = Path(__file__).parent.parent.resolve()
 ICON_PATH = HERE / "icons/"
 
 
-@exec_ui(display_name="Configuration & switch-on", use_kernel=True)
-def switch_on_piezos(
+@exec_ui(display_name="Load profile", use_kernel=True)
+def load_profile(
     profile: Callback(profiles, name="Voltage profile") = None,
 ) -> None:
     """Configures and switches on the Wave Generators for the given voltage profile.
@@ -30,19 +30,5 @@ def switch_on_piezos(
         print(
             f"Failed to configure + switch on wave generators, using profile {profile}: {e}"
         )
-
-    end_observation()
-
-
-@exec_ui(display_name="Switch-off", use_kernel=True)
-def switch_off_piezos() -> None:
-    """Switches off the Wave Generators."""
-
-    start_observation("Switch off wave generators")
-
-    try:
-        switch_off_awg(profile=profile)
-    except Exception as e:
-        print(f"Failed to switch off wave generators: {e}")
 
     end_observation()
