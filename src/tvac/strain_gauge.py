@@ -10,7 +10,9 @@ import csv
 import datetime
 import os
 import threading
+from pathlib import Path
 
+from egse.env import get_data_storage_location
 from egse.setup import Setup, load_setup
 
 
@@ -119,6 +121,22 @@ def _coerce_positive_float(value, field_name: str) -> float:
     if coerced <= 0:
         raise ValueError(f"{field_name} must be > 0, got {coerced}")
     return coerced
+
+
+def _resolve_csv_save_path(path: str) -> str:
+    """Resolve SG CSV output paths relative to the CGSE daily data directory."""
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return str(candidate)
+
+    try:
+        storage_root = Path(get_data_storage_location()).expanduser()
+        daily_stamp = datetime.datetime.now(
+            tz=datetime.timezone.utc
+        ).strftime("%Y%m%d")
+        return str(storage_root / "daily" / daily_stamp / candidate)
+    except Exception:
+        return str(candidate)
 
 
 def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
@@ -508,7 +526,7 @@ def start_sg_logging(setup: Setup = None):
             return
 
         _csv_enabled = bool(effective["csv"]["enabled"])
-        _save_path = str(effective["csv"]["save_path"])
+        _save_path = _resolve_csv_save_path(str(effective["csv"]["save_path"]))
         _base_filename = str(effective["csv"]["base_filename"])
         _max_file_size = int(effective["csv"]["max_file_size_bytes"])
 
