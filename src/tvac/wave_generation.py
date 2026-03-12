@@ -1,16 +1,16 @@
-import scipy.io
-import time
-
 import numpy as np
+import time
 from egse.arbitrary_wave_generator.aim_tti import (
     WaveformShape,
     OutputWaveformType,
     Output,
+    SweepType,
+    SweepMode,
+    Sweep,
 )
 from egse.arbitrary_wave_generator.aim_tti.tgf4000 import Tgf4000Interface
 from egse.observation import building_block
 from egse.setup import load_setup, Setup
-from navdict.navdict import NavDict
 
 
 class ArbConfig:
@@ -164,7 +164,7 @@ def config_awg(profile: str, setup: Setup = None) -> None:
     awg1: Tgf4000Interface = setup.gse.wave_generators.awg1.device
     awg2: Tgf4000Interface = setup.gse.wave_generators.awg2.device
 
-    for awg, channel, config, func in zip(
+    for awg, channel, config in zip(
         (awg1, awg1, awg2), (1, 2, 1), (v1_config, v2_config, v3_config)
     ):
         # Configure the current channel for the current wave generator, based on the current configuration information
@@ -244,45 +244,96 @@ def switch_off_awg(setup: Setup = None):
     setup = setup or load_setup()
 
     awg1: Tgf4000Interface = setup.gse.wave_generators.awg1.device
-    awg1.set_channel(1)
-    awg1.set_output(Output.OFF)
-    awg1.set_channel(2)
-    awg1.set_output(Output.OFF)
-
     awg2: Tgf4000Interface = setup.gse.wave_generators.awg2.device
-    awg2.set_channel(1)
-    awg2.set_output(Output.OFF)
+
+    for awg, channel in zip((awg1, awg1, awg2), (1, 2, 1)):
+        awg.set_channel(channel)
+        awg.set_sweep(Sweep.OFF)
+        awg.set_output(Output.OFF)
 
 
-# def get_arb_waves(piezo_setup: dict, factor: float):
-#                 # (filename: str = '/Users/sara/Downloads/SIGN_1_LG.mat', profile: str = None):
-#     """Returns the frequency and time series for all piezo actuators.
-#
-#     In the given dictionary, the MatLab file with the voltage time series and corresponding frequency for the piezo
-#     actuators has been loaded.  The format of this dictionary is a bit inconvenient, so we fix that in this method.
-#
-#     The voltages that are sent out by the wave generators will go through an amplifier before they are passed on to the
-#     piezo actuators. This amplification has already been included in the voltage time series.  By multiplying with the
-#     given factor, we undo this amplification (and hence we get the signal strength that we need for the wave
-#     generators).
-#
-#     Args:
-#          piezo_setup (dict): Dictionary in which the MatLab file with the voltage time series and corresponding
-#                              frequency has been loaded.
-#          factor (float):
-#     """
-#
-#     # mat = scipy.io.loadmat(filename)
-#     # profile = profile or str.split(filename, "/")[-1][:-4]
-#
-#     signal_key = next(key for key in piezo_setup if not key.startswith("__"))  # Select only non-dunder keyword
-#
-#     signal = piezo_setup[signal_key]
-#
-#     return {
-#         "frequency": np.asarray(signal['f_Hz'][0, 0]).item(),
-#         "time": np.ravel(signal['t_vec_s'][0, 0]),
-#         "V1_V": np.ravel(signal['V1_V'][0, 0]) * factor,
-#         "V2_V": np.ravel(signal['V2_V'][0, 0]) * factor,
-#         "V3_V": np.ravel(signal['V3_V'][0, 0]) * factor,
-#     }
+@building_block
+def characterize_piezo(
+    piezo: str,
+    amplitude: float,
+    dc_offset: float,
+    start_frequency: float,
+    stop_frequency: float,
+    sweep_time: float,
+    fixed_voltage: float,
+    setup: Setup = None,
+) -> None:
+    """Charactersisation of the given piezo actuator.
+
+    For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators, we
+    configure a constant voltage.
+
+    Args:
+        piezo (str): Name of the piezo actuator for which to configure a frequency sweep.
+        amplitude (str): Amplitude for the frequency sweep [Vpp].
+        dc_offset (str): DC offset for the frequency sweep [Vdc].
+        start_frequency (float): Start frequency for the frequency sweep [Hz].
+        stop_frequency (float): Stop frequency for the frequency sweep [Hz].
+        sweep_time (float): Frequency sweep time [s].
+        fixed_voltage (float): Fixed voltage for the other piezo actuators.
+        setup (Setup): Setup from which to extract the information from the piezo actuators and corresponding Wave
+                       Generators.
+    """
+
+    setup = setup or load_setup()
+
+    wave_generators_setup = setup.gse.wave_generators
+
+    awg_list = []
+    channel_list = []
+
+    # Loop over all wave generators
+    for _, awg in wave_generators_setup.items():
+        if "piezo_channels" in awg:  # Exclude the calibration block
+            for piezo_name, channel in awg.piezo_channels.items():
+                # We configure all channels before turning on their output.  We will first turn on the output for the
+                # channels with a constant voltage and then the output for the channels with the frequency sweep (this
+                # is why the order in which information is added to `awg_list` and `channel_list`) matters (appending
+                # for the channels with constant voltage, prepending for the channel with the frequency sweep).
+
+                if piezo_name == piezo:
+                    # Make sure the output for this channel is turned on last
+
+                    awg_list.append(awg)
+                    channel_list.append(channel)
+
+                    # Configure the frequency sweep
+
+                    awg.set_channel(channel)
+                    awg.set_waveform_shape(WaveformShape.SINE)
+                    awg.set_amplitude(amplitude)
+                    awg.set_dc_offset(dc_offset)
+                    awg.set_output_load(50)
+
+                    awg.set_sweep_type(SweepType.LINUP)
+                    awg.set_sweep_mode(SweepMode.CONTINUOUS)
+                    awg.set_sweep_start_frequency(start_frequency)
+                    awg.set_sweep_stop_frequency(stop_frequency)
+                    awg.set_sweep_time(sweep_time)
+
+                    awg.set_sweep(Sweep.ON)
+                else:
+                    # Make sure the output for the channels with constant voltages are turned on first (i.e. before
+                    # switching on the output for the channel with the frequency sweep)
+
+                    awg_list.insert(0, awg)
+                    channel_list.insert(0, channel)
+
+                    # Configure the constant voltage
+
+                    awg.set_channel(channel)
+                    awg.set_waveform_shape(WaveformShape.ARB)
+                    awg.set_arb_waveform(OutputWaveformType.DC)
+                    awg.set_dc_offset(fixed_voltage)
+
+    # Turn on the output for all channels (the ones with constant voltage are done before the channel with the
+    # frequency sweep -> this is enforced by the way `awg_list` and `channel_list` are populated)
+
+    for awg, channel in zip(awg_list, channel_list):
+        awg.set_channel(channel)
+        awg.set_output(Output.ON)
