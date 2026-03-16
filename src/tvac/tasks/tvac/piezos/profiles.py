@@ -5,7 +5,7 @@ from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback
 
 from tvac.tasks.tvac.piezos import profiles
-from tvac.wave_generation import config_awg
+from tvac.wave_generation import load_voltage_profile
 
 UI_MODULE_DISPLAY_NAME = "2 - Profiles"
 HERE = Path(__file__).parent.parent.resolve()
@@ -25,7 +25,7 @@ def load_profile(
     start_observation("Configure + switch on wave generators, using profile {profile}")
 
     try:
-        config_awg(profile=profile)
+        load_voltage_profile(profile=profile)
     except Exception as e:
         print(
             f"Failed to configure + switch on wave generators, using profile {profile}: {e}"

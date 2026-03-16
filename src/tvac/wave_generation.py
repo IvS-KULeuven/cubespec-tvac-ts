@@ -147,7 +147,7 @@ class ArbConfig:
 
 
 @building_block
-def config_awg(profile: str, setup: Setup = None) -> None:
+def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     """Configures the wave generators to send voltage profiles to the piezo actuators.
 
     Args:
