@@ -1,4 +1,5 @@
 import numpy as np
+import pigpio
 import time
 from egse.arbitrary_wave_generator.aim_tti import (
     WaveformShape,
@@ -7,10 +8,15 @@ from egse.arbitrary_wave_generator.aim_tti import (
     SweepType,
     SweepMode,
     Sweep,
+    TriggerSource,
+    Burst,
 )
 from egse.arbitrary_wave_generator.aim_tti.tgf4000 import Tgf4000Interface
 from egse.observation import building_block
+from egse.settings import Settings
 from egse.setup import load_setup, Setup
+
+TRIGGER_SETTINGS = Settings.load("Aim-TTi TGF4000").TRIGGER
 
 
 class ArbConfig:
@@ -185,7 +191,16 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
         )  # Waveform shape
         time.sleep(2)
         awg.set_arb_waveform(output_waveform_type)
-        awg.set_output(Output.ON)  # Switch on
+
+        # Set the output on, but wait for the external trigger signal to start generating waveforms
+
+        awg.set_burst_trigger_source(TriggerSource.EXTERNAL)
+        awg.set_burst(Burst.INFINITE)
+        awg.set_output(Output.ON)
+
+    # External trigger, coming from the Raspberry Pi -> Start waveform generation
+
+    start_signal_trigger()
 
 
 def extract_awg_config_from_setup(profile: str, setup: Setup = None):
@@ -234,25 +249,6 @@ def extract_awg_config_from_setup(profile: str, setup: Setup = None):
 
 
 @building_block
-def switch_off_awg(setup: Setup = None):
-    """Switches off the wave generators.
-
-    Args:
-        setup (Setup): Setup from which to extract the information from the wave generators.
-    """
-
-    setup = setup or load_setup()
-
-    awg1: Tgf4000Interface = setup.gse.wave_generators.awg1.device
-    awg2: Tgf4000Interface = setup.gse.wave_generators.awg2.device
-
-    for awg, channel in zip((awg1, awg1, awg2), (1, 2, 1)):
-        awg.set_channel(channel)
-        awg.set_sweep(Sweep.OFF)
-        awg.set_output(Output.OFF)
-
-
-@building_block
 def characterize_piezo(
     piezo: str,
     amplitude: float,
@@ -284,31 +280,20 @@ def characterize_piezo(
 
     wave_generators_setup = setup.gse.wave_generators
 
-    awg_list = []
-    channel_list = []
-
     # Loop over all wave generators
+
     for _, awg in wave_generators_setup.items():
         if "piezo_channels" in awg:  # Exclude the calibration block
             for piezo_name, channel in awg.piezo_channels.items():
-                # We configure all channels before turning on their output.  We will first turn on the output for the
-                # channels with a constant voltage and then the output for the channels with the frequency sweep (this
-                # is why the order in which information is added to `awg_list` and `channel_list`) matters (appending
-                # for the channels with constant voltage, prepending for the channel with the frequency sweep).
+                awg.set_channel(channel)
 
                 if piezo_name == piezo:
-                    # Make sure the output for this channel is turned on last
-
-                    awg_list.append(awg)
-                    channel_list.append(channel)
-
-                    # Configure the frequency sweep
-
-                    awg.set_channel(channel)
                     awg.set_waveform_shape(WaveformShape.SINE)
                     awg.set_amplitude(amplitude)
                     awg.set_dc_offset(dc_offset)
                     awg.set_output_load(50)
+
+                    # Configure the frequency sweep
 
                     awg.set_sweep_type(SweepType.LINUP)
                     awg.set_sweep_mode(SweepMode.CONTINUOUS)
@@ -318,22 +303,131 @@ def characterize_piezo(
 
                     awg.set_sweep(Sweep.ON)
                 else:
-                    # Make sure the output for the channels with constant voltages are turned on first (i.e. before
-                    # switching on the output for the channel with the frequency sweep)
-
-                    awg_list.insert(0, awg)
-                    channel_list.insert(0, channel)
-
                     # Configure the constant voltage
 
-                    awg.set_channel(channel)
                     awg.set_waveform_shape(WaveformShape.ARB)
                     awg.set_arb_waveform(OutputWaveformType.DC)
                     awg.set_dc_offset(fixed_voltage)
 
-    # Turn on the output for all channels (the ones with constant voltage are done before the channel with the
-    # frequency sweep -> this is enforced by the way `awg_list` and `channel_list` are populated)
+                # Set the output on, but wait for the external trigger signal to start generating waveforms
 
-    for awg, channel in zip(awg_list, channel_list):
+                awg.set_burst_trigger_source(TriggerSource.EXTERNAL)
+                awg.set_burst(Burst.INFINITE)
+                awg.set_output(Output.ON)
+
+    # External trigger, coming from the Raspberry Pi -> Start waveform generation
+
+    start_signal_trigger()
+
+
+@building_block
+def switch_off_awg(setup: Setup = None):
+    """Switches off the wave generators.
+
+    Args:
+        setup (Setup): Setup from which to extract the information from the wave generators.
+    """
+
+    setup = setup or load_setup()
+
+    awg1: Tgf4000Interface = setup.gse.wave_generators.awg1.device
+    awg2: Tgf4000Interface = setup.gse.wave_generators.awg2.device
+
+    # External trigger, coming from the Raspberry Pi -> Stop waveform generation
+
+    stop_signal_trigger()
+
+    for awg, channel in zip((awg1, awg1, awg2), (1, 2, 1)):
         awg.set_channel(channel)
-        awg.set_output(Output.ON)
+        awg.set_output(Output.OFF)
+
+        # Make sure that you return to the default operation settings
+        # (e.g. no frequency sweep, no external trigger, etc.)
+
+        awg.reset()
+
+
+def start_signal_trigger(
+    hostname: str = TRIGGER_SETTINGS["HOSTNAME"], gpio: int = TRIGGER_SETTINGS["GPIO"]
+) -> None:
+    """Sets the triggering GPIO pin high on the Raspberry Pi.
+
+    The given GPIO pin on the Raspberry Pi is connected to the TRIG/COUNT (DC) IN port (BNC centre) on the rear panel
+    of the wave generators.  That way it can act as external trigger source, to make sure all waveforms are in sync.
+    The wave generators must therefore be configured in infinite burst with an external trigger source.
+
+    Args:
+        hostname (str): Hostname of the Raspberry Pi.
+        gpio (int): GPIO pin to set high (BCM numbering).
+    """
+
+    # Connect to the Raspberry Pi on port 8888
+
+    pi = pigpio.pi(hostname, 8888)
+    if not pi.connected:
+        raise RuntimeError("Could not connect to pigpio daemon at {}".format(hostname))
+
+    try:
+        # Set GPIO pin high
+
+        pi.set_mode(gpio, pigpio.OUTPUT)
+        pi.write(gpio, 1)
+    finally:
+        # Disconnect from the Raspberry Pi
+
+        pi.stop()
+
+
+def stop_signal_trigger(
+    hostname: str = TRIGGER_SETTINGS["HOSTNAME"], gpio: int = TRIGGER_SETTINGS["GPIO"]
+):
+    """Sets the triggering GPIO pin low on the Raspberry Pi.
+
+    The given GPIO pin on the Raspberry Pi is connected to the TRIG/COUNT (DC) IN port (BNC centre) on the rear panel
+    of the wave generators.  That way it can act as external trigger source, to make sure all waveforms are in sync.
+    The wave generators must therefore be configured in infinite burst with an external trigger source.
+
+    Args:
+        hostname (str): Hostname of the Raspberry Pi.
+        gpio (int): GPIO pin to set high (BCM numbering).
+    """
+
+    # Connect to the Raspberry Pi on port 8888
+
+    pi = pigpio.pi(hostname, 8888)
+    if not pi.connected:
+        raise RuntimeError("Could not connect to pigpio daemon at {}".format(hostname))
+
+    try:
+        # Set GPIO pin low
+
+        pi.set_mode(gpio, pigpio.OUTPUT)
+        pi.write(gpio, 0)
+    finally:
+        # Disconnect from the Raspberry Pi
+
+        pi.stop()
+
+
+def check_trigger(hostname=TRIGGER_SETTINGS["HOSTNAME"]) -> None:
+    """Checks whether a connection can be established with the Raspberry Pi that is used as external trigger source.
+
+    The required GPIO pin on the Raspberry Pi is connected to the TRIG/COUNT (DC) IN port (BNC centre) on the rear panel
+    of the wave generators.  That way it can act as external trigger source, to make sure all waveforms are in sync.
+    The wave generators must therefore be configured in infinite burst with an external trigger source.
+
+    Args:
+        hostname (str): Hostname of the Raspberry Pi.
+    """
+
+    import socket
+
+    s = socket.socket()
+    try:
+        s.settimeout(3)
+        s.connect((hostname, 8888))
+        print("Port is reachable!")
+    except Exception as e:
+        print("Port not reachable:", e)
+    finally:
+        s.close()

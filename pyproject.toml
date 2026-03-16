@@ -29,6 +29,7 @@ dependencies = [
     "pyqt5",
     "pytz",
     "scipy>=1.15.3",
+    "pigpio",
 ]
 
 [project.entry-points."navdict.directive"]
