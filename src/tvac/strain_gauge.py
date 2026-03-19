@@ -99,7 +99,7 @@ def _sg_debug(message: str) -> None:
     if not os.environ.get("TVAC_SG_DEBUG", "").strip():
         return
 
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    stamp = format_datetime()
     thread_name = threading.current_thread().name
     print(f"[strain_gauge {stamp} {thread_name}] {message}")
 
@@ -152,7 +152,7 @@ def _resolve_csv_save_path(path: str) -> str:
 
     try:
         storage_root = Path(get_data_storage_location()).expanduser()
-        daily_stamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%d")
+        daily_stamp = format_datetime(fmt="%Y%m%d")
         return str(storage_root / "daily" / daily_stamp / candidate)
     except Exception:
         return str(candidate)
@@ -463,7 +463,7 @@ def _rotate_csv(headers):
     _csv_filename = os.path.join(_save_path, fname)
     _csv_file = open(_csv_filename, "w", newline="")
     _csv_writer = csv.writer(_csv_file)
-    _csv_writer.writerow(["Timestamp"] + headers)
+    _csv_writer.writerow(["timestamp"] + headers)
     _file_index += 1
     print(f"Logging to: {_csv_filename}")
 
@@ -608,7 +608,7 @@ def start_sg_logging(setup: Setup = None):
         if _csv_enabled:
             os.makedirs(_save_path, exist_ok=True)
 
-        _start_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        _start_ts = format_datetime()
         _file_index = 0
         _read_count = 0
         _csv_file = None
