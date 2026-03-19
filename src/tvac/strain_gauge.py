@@ -163,21 +163,21 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
     cfg = setup.gse.labjack_t7
     return {
         "stream": {
-            "scan_rate": float(cfg.stream.scan_rate),
-            "resync_interval_s": int(cfg.stream.resync_interval_s),
-            "buffer_size": int(cfg.stream.buffer_size),
+            "scan_rate": cfg.stream.scan_rate,
+            "resync_interval_s": cfg.stream.resync_interval_s,
+            "buffer_size": cfg.stream.buffer_size,
         },
         "csv": {
-            "enabled": bool(cfg.csv.enabled),
-            "save_path": str(cfg.csv.save_path),
-            "base_filename": str(cfg.csv.base_filename),
-            "max_file_size_bytes": int(cfg.csv.max_file_size_bytes),
+            "enabled": cfg.csv.enabled,
+            "save_path": cfg.csv.save_path,
+            "base_filename": cfg.csv.base_filename,
+            "max_file_size_bytes": cfg.csv.max_file_size_bytes,
         },
         "plot": {
-            "enabled": bool(cfg.plot.enabled),
-            "window_seconds": float(cfg.plot.window_seconds),
-            "interval_ms": int(cfg.plot.interval_ms),
-            "show_stats": bool(cfg.plot.show_stats),
+            "enabled": cfg.plot.enabled,
+            "window_seconds": cfg.plot.window_seconds,
+            "interval_ms": cfg.plot.interval_ms,
+            "show_stats": cfg.plot.show_stats,
         },
     }
 
