@@ -1,8 +1,20 @@
 from typing import List
-
 from egse.setup import load_setup
 
 UI_TAB_DISPLAY_NAME = "Heaters"
+
+HEATERS = [
+    "HFGS",
+    "HDET",
+    "HDEL",
+    "HPCU",
+    "HADC",
+    "HACT",
+    "HSAG",
+    "HAV1",
+    "HAV2",
+    "HFSS",
+]
 
 
 def heaters() -> List[str]:

@@ -26,6 +26,8 @@ dependencies = [
     "kikusui-power-supply",
     "aim-tti-awg",
     "gui-executor",
+    "labjack-ljm",
+    "matplotlib",
     "pyqt5",
     "pytz",
     "scipy>=1.15.3",
