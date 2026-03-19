@@ -1,6 +1,10 @@
 import os
 import sys
 from pathlib import Path
+from executor import ExternalCommand
+import gui_executor.client as client
+
+from gui_executor.__main__ import main as gui_executor_main
 
 HERE = Path(__file__).parent.resolve()
 
@@ -19,12 +23,10 @@ def _resolve_cmd_log_dir() -> str:
 
 
 def tvac_ui():
-    import gui_executor.client as client
-
-    from gui_executor.__main__ import main as gui_executor_main
-
     client.MyClient.wait_for_ready = _wait_for_ready  # type: ignore[assignment]
 
+    logo_path = HERE / "icons/dashboard.svg"
+    cmd_log = _resolve_cmd_log_dir()
 
     cmd = ExternalCommand(
         f"gui-executor --verbose --module-path tvac.tasks.tvac.heaters "
