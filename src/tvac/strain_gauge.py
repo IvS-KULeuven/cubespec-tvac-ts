@@ -152,9 +152,7 @@ def _resolve_csv_save_path(path: str) -> str:
 
     try:
         storage_root = Path(get_data_storage_location()).expanduser()
-        daily_stamp = datetime.datetime.now(
-            tz=datetime.timezone.utc
-        ).strftime("%Y%m%d")
+        daily_stamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%d")
         return str(storage_root / "daily" / daily_stamp / candidate)
     except Exception:
         return str(candidate)
@@ -200,7 +198,9 @@ def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
         }
     if channels:
         _cached_channel_names = list(channels.keys())
-        _cached_channel_settings = {name: dict(values) for name, values in channels.items()}
+        _cached_channel_settings = {
+            name: dict(values) for name, values in channels.items()
+        }
     return channels
 
 
@@ -213,7 +213,9 @@ def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]
     return effective
 
 
-def _get_effective_channel_settings(setup: Setup = None) -> dict[str, dict[str, object]]:
+def _get_effective_channel_settings(
+    setup: Setup = None,
+) -> dict[str, dict[str, object]]:
     """Return setup-derived channel settings with per-channel overrides applied."""
     setup = setup or load_setup()
     effective = _snapshot_setup_channels(setup)
@@ -466,7 +468,9 @@ def _rotate_csv(headers):
     print(f"Logging to: {_csv_filename}")
 
 
-def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_backlog):
+def _on_stream_data(
+    *, timestamps, readings, channel_names, device_backlog, ljm_backlog
+):
     """Process one streamed batch from :class:`LabJackT7Logger`.
 
     This callback is the central fan-out point of the SG data flow:
@@ -499,8 +503,7 @@ def _on_stream_data(*, timestamps, readings, channel_names, device_backlog, ljm_
             # The logger already grouped raw stream values into per-scan rows.
             # CSV output therefore becomes a simple row-wise append.
             rows = [
-                [ts.isoformat()] + list(row)
-                for ts, row in zip(timestamps, readings)
+                [ts.isoformat()] + list(row) for ts, row in zip(timestamps, readings)
             ]
             _csv_writer.writerows(rows)
             _csv_file.flush()
@@ -566,7 +569,9 @@ def start_sg_logging(setup: Setup = None):
         if ch_cfg["enabled"]
     ]
     if not selected_channels:
-        raise ValueError("No SG channels are enabled. Enable at least one channel first.")
+        raise ValueError(
+            "No SG channels are enabled. Enable at least one channel first."
+        )
 
     # Flatten the enabled channel mapping into the parallel lists expected by
     # LabJackT7Logger and the plot buffers.
@@ -611,9 +616,7 @@ def start_sg_logging(setup: Setup = None):
         _csv_filename = ""
 
         _plot_enabled = bool(effective["plot"]["enabled"])
-        _plot_keep_seconds = max(
-            1.0, float(effective["plot"]["window_seconds"]) * 1.2
-        )
+        _plot_keep_seconds = max(1.0, float(effective["plot"]["window_seconds"]) * 1.2)
         _active_channel_labels = active_channel_labels
 
         _logger = LabJackT7Logger(

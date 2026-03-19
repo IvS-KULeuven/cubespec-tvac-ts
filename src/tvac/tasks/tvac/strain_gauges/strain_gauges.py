@@ -351,7 +351,9 @@ def configure_csv(
 
 @exec_ui(display_name="Configure plot", use_kernel=True)
 def configure_plot(
-    config: SGPlotConfig(name="enabled / window_seconds / interval_ms / show_stats") = None,
+    config: SGPlotConfig(
+        name="enabled / window_seconds / interval_ms / show_stats"
+    ) = None,
 ) -> None:
     """Set runtime plot settings (applied on next Start logging)."""
     try:
@@ -390,6 +392,7 @@ def start_logging() -> None:
 
         if get_sg_effective_settings(setup=setup)["plot"]["enabled"]:
             from tvac.strain_gauge_plot import open_live_plot
+
             open_live_plot(setup=setup)
 
     except Exception as e:

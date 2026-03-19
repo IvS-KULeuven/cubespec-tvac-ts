@@ -57,9 +57,7 @@ class LabJackT7Logger:
         """Normalize scalar or per-channel input to a list of length ``n``."""
         if isinstance(value, (list, tuple)):
             if len(value) != n:
-                raise ValueError(
-                    f"{label}: expected {n} values, got {len(value)}"
-                )
+                raise ValueError(f"{label}: expected {n} values, got {len(value)}")
             return list(value)
         return [value] * n
 
@@ -80,7 +78,9 @@ class LabJackT7Logger:
 
         n = len(ain_channels)
         self.voltage_ranges = self._expand(voltage_range, n, "voltage_range")
-        self.neg_voltage_ranges = self._expand(neg_voltage_range, n, "neg_voltage_range")
+        self.neg_voltage_ranges = self._expand(
+            neg_voltage_range, n, "neg_voltage_range"
+        )
         self.resolution_indices = self._expand(resolution_index, n, "resolution_index")
 
         # Derived
@@ -208,11 +208,11 @@ class LabJackT7Logger:
             "STREAM_BUFFER_SIZE_BYTES",
         ]
         values += [
-            0,                        # free-running
-            0,                        # internal clock
-            0,                        # stream-level resolution (per-channel set above)
-            0.0,                      # auto settling (float < 1)
-            0,                        # continuous
+            0,  # free-running
+            0,  # internal clock
+            0,  # stream-level resolution (per-channel set above)
+            0.0,  # auto settling (float < 1)
+            0,  # continuous
             self.buffer_size,
         ]
 
@@ -264,7 +264,9 @@ class LabJackT7Logger:
             # The T7 does not provide a per-scan host timestamp. We therefore
             # derive timestamps from the negotiated scan rate and periodically
             # re-anchor to the current host clock to limit long-run drift.
-            if (self._scan_index - self._anchor_scan_count) >= self._resync_interval_scans:
+            if (
+                self._scan_index - self._anchor_scan_count
+            ) >= self._resync_interval_scans:
                 self._t_anchor = datetime.datetime.now()
                 self._anchor_scan_count = self._scan_index
                 print(f"[Re-anchored host clock at scan {self._scan_index}]")
@@ -301,8 +303,11 @@ class LabJackT7Logger:
 
         scan_list = ljm.namesToAddresses(self.num_addresses, self.channel_names)[0]
         self._actual_scan_rate = ljm.eStreamStart(
-            self._handle, self.scans_per_read, self.num_addresses,
-            scan_list, self.scan_rate,
+            self._handle,
+            self.scans_per_read,
+            self.num_addresses,
+            scan_list,
+            self.scan_rate,
         )
 
         self._t_anchor = datetime.datetime.now()

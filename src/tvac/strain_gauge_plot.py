@@ -8,6 +8,7 @@ consumes shared buffers from ``tvac.strain_gauge``.
 import bisect
 
 import matplotlib
+
 # GUI Executor is Qt-based; prefer a Qt backend to avoid Tk/Qt event-loop conflicts.
 if "qt" not in matplotlib.get_backend().lower():
     try:
@@ -27,8 +28,14 @@ from tvac.strain_gauge import (
 
 # Default colours, extended automatically if more channels are needed.
 _COLORS = [
-    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
-    "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
 ]
 
 
@@ -61,7 +68,9 @@ def open_live_plot(setup=None):
 
     colors = (_COLORS * ((num_channels // len(_COLORS)) + 1))[:num_channels]
 
-    fig, axes = plt.subplots(num_channels, 1, figsize=(10, 2.5 * num_channels), sharex=True)
+    fig, axes = plt.subplots(
+        num_channels, 1, figsize=(10, 2.5 * num_channels), sharex=True
+    )
     if num_channels == 1:
         axes = [axes]
     fig.suptitle("LabJack T7 — Strain Gauge Live View", fontsize=13)
@@ -78,13 +87,19 @@ def open_live_plot(setup=None):
 
         if show_stats:
             txt = ax.text(
-                0.01, 0.97, "",
+                0.01,
+                0.97,
+                "",
                 transform=ax.transAxes,
                 fontsize=7.5,
                 verticalalignment="top",
                 horizontalalignment="left",
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                          alpha=0.7, edgecolor="gray"),
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="white",
+                    alpha=0.7,
+                    edgecolor="gray",
+                ),
                 family="monospace",
             )
             stat_texts.append(txt)
@@ -127,16 +142,13 @@ def open_live_plot(setup=None):
                 lo = min(v_win[ch])
                 hi = max(v_win[ch])
                 mn = sum(v_win[ch]) / len(v_win[ch])
-                txt.set_text(
-                    f"min: {lo:+.5f} V\n"
-                    f"max: {hi:+.5f} V\n"
-                    f"mean:{mn:+.5f} V"
-                )
+                txt.set_text(f"min: {lo:+.5f} V\nmax: {hi:+.5f} V\nmean:{mn:+.5f} V")
 
         return lines
 
     _ani = animation.FuncAnimation(
-        fig, _update,
+        fig,
+        _update,
         interval=interval_ms,
         blit=False,
         cache_frame_data=False,
