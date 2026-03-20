@@ -544,14 +544,15 @@ def _on_stream_data(
                 _rotate_csv(channel_names)
 
     if metrics_enabled:
-        batch = pd.DataFrame(readings, columns=channel_names)
-        batch["time"] = pd.to_datetime(timestamps)
-
-        metrics_client.write(
-            record=batch,
-            data_frame_measurement_name=ORIGIN.lower(),
-            data_frame_timestamp_column="time",
-        )
+        points = [
+            {
+                "measurement": ORIGIN.lower(),
+                "time": ts,
+                "fields": dict(zip(channel_names, row)),
+            }
+            for ts, row in zip(timestamps, readings)
+        ]
+        metrics_client.write(points)
 
     if plot_enabled:
         if logger is None or logger.stream_start_time is None:
