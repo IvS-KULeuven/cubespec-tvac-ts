@@ -337,7 +337,7 @@ class LabJackT7Logger:
             self.scan_rate,
         )
 
-        self._t_anchor = datetime.datetime.now()
+        self._t_anchor = datetime.datetime.now(tz=datetime.timezone.utc)
         self._stream_start_time = self._t_anchor
         self._anchor_scan_count = 0
         self._scan_index = 0
