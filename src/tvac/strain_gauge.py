@@ -552,7 +552,10 @@ def _on_stream_data(
             }
             for ts, row in zip(timestamps, readings)
         ]
-        metrics_client.write(points)
+        try:
+            metrics_client.write(points)
+        except Exception as exc:
+            _sg_debug(f"metrics write failed: {exc}")
 
     if plot_enabled:
         if logger is None or logger.stream_start_time is None:
