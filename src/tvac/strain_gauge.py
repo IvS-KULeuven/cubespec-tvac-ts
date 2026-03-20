@@ -544,9 +544,8 @@ def _on_stream_data(
                 _rotate_csv(channel_names)
 
     if metrics_enabled:
-        batch = pd.DataFrame(readings, columns=["timestamp"] + channel_names)
-        batch["time"] = pd.to_datetime(batch["timestamp"])
-        batch = batch.drop(columns=["timestamp"])
+        batch = pd.DataFrame(readings, columns=channel_names)
+        batch["time"] = pd.to_datetime(timestamps)
 
         metrics_client.write(
             record=batch,
