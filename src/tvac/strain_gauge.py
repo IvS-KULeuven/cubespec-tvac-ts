@@ -60,6 +60,7 @@ _max_file_size = 5_000 * 1024
 
 # Metrics defaults (overridden by setup)
 _metrics_enabled = True
+_metrics_write_failed = False
 
 # Plot flag
 _plot_enabled = True
@@ -555,6 +556,10 @@ def _on_stream_data(
         try:
             metrics_client.write(points)
         except Exception as exc:
+            global _metrics_write_failed
+            if not _metrics_write_failed:
+                print(f"Warning: metrics write to InfluxDB failed: {exc}")
+                _metrics_write_failed = True
             _sg_debug(f"metrics write failed: {exc}")
 
     if plot_enabled:
@@ -595,7 +600,7 @@ def start_sg_logging(setup: Setup = None):
     6. start the stream so data begins arriving through ``_on_stream_data``.
     """
     global _logger, _csv_enabled, _save_path, _base_filename, _max_file_size
-    global _metrics_enabled
+    global _metrics_enabled, _metrics_write_failed
     global _plot_enabled, _plot_keep_seconds, _start_ts
     global _file_index, _read_count, _csv_file, _csv_writer, _csv_filename
     global _active_channel_labels
@@ -656,6 +661,7 @@ def start_sg_logging(setup: Setup = None):
         _csv_filename = ""
 
         _metrics_enabled = bool(effective["metrics"]["enabled"])
+        _metrics_write_failed = False
 
         _plot_enabled = bool(effective["plot"]["enabled"])
         _plot_keep_seconds = max(1.0, float(effective["plot"]["window_seconds"]) * 1.2)
