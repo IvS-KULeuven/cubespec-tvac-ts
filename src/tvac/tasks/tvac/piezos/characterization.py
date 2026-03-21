@@ -12,12 +12,12 @@ UI_MODULE_DISPLAY_NAME = "1 - Characterisation"
 @exec_ui(display_name="Start characterisation", use_kernel=True)
 def start_piezo_characterization(
     piezo: Callback(piezos, name="Piezo actuator to sweep") = None,
-    amplitude: Callback(float, name="Amplitude for frequency sweep [Vpp]") = 5.0,
-    dc_offset: Callback(float, name="DC offset for frequency sweep [Vdc]") = 0,
-    start_frequency: Callback(float, name="Sweep start frequency [Hz]") = 1000,
-    stop_frequency: Callback(float, name="Sweep stop frequency [Hz]") = 10000,
-    sweep_time: Callback(float, name="Sweep time [s]") = 60,
-    fixed_voltage: Callback(float, name="Constant voltage (other piezos) [Vdc]") = 0.0,
+    amplitude: Callback(float, name="Amplitude for frequency sweep [Vpp]") = 0.2,
+    dc_offset: Callback(float, name="DC offset for frequency sweep [Vdc]") = 0.15,
+    start_frequency: Callback(float, name="Sweep start frequency [Hz]") = 1,
+    stop_frequency: Callback(float, name="Sweep stop frequency [Hz]") = 1500,
+    sweep_time: Callback(float, name="Sweep time [s]") = 40,
+    fixed_voltage: Callback(float, name="Constant voltage (other piezos) [Vdc]") = 0.15,
 ):
     """Charactersisation of the given piezo actuator.
 
