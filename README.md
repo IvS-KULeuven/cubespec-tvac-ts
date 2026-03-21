@@ -43,6 +43,9 @@ output 2.499 V, since it is reference to `GND`.
 
 ## Environment setup
 
+To control the LabJack T7, you need to install the [JVM library](https://support.labjack.com/docs/ljm-software-installer-downloads-t4-t7-t8-digit). 
+Note that this is different from the `labjack-ljm` Python package, which is installed by `uv`.
+
 Set up a virtual environment and install the dependencies:
 
 ```bash
