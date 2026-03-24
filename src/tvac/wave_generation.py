@@ -158,23 +158,47 @@ class ArbConfig:
 def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     """Configures the wave generators to send voltage profiles to the piezo actuators.
 
+    The use of an external trigger means that - when the output is enabled - the wave generation already starts, but
+    is frozen at the first value of the configured waveform.  It is only when the external trigger signal is received
+    that the wave generation is resumed.  As a result, the channels are not synchronised and there can be a steep
+    increase in voltage.  The latter would mean that a large current is drawn from the piezo actuators, which can
+    potentially damage them.  This is why we've implemented a soft start.  More information can be found here:
+    https://github.com/IvS-KULeuven/cubespec-tvac-ts/issues/52.
+
     Args:
         profile (str): Voltage profile.
         setup (Setup): Setup from which to extract the information from the wave generators.
     """
 
     setup = setup or load_setup()
+    wave_generators_setup = setup.gse.wave_generators
+
+    # Extract the voltage profiles for the piezo actuators
+    # -> These contain the amplitude, output load, DC offset, and signal (the frequency comes separately)
 
     v1_config, v2_config, v3_config, frequency = extract_awg_config_from_setup(
         profile, setup=setup
     )
 
-    awg1: Tgf4000Interface = setup.gse.wave_generators.awg1.device
-    awg2: Tgf4000Interface = setup.gse.wave_generators.awg2.device
+    awg1: Tgf4000Interface = wave_generators_setup.awg1.device
+    awg2: Tgf4000Interface = wave_generators_setup.awg2.device
+
+    # We will configure all channels with the requested voltage profile (arbitrary waveform).  Have a look at #52 on
+    # more information how this works.
+
+    soft_start_dc_offset = []  # DC offset when the soft start begins
+    final_dc_offset = []  # DC offset when the soft start ends (i.e. the actual DC offset of the waveform)
 
     for awg, channel, config in zip(
         (awg1, awg1, awg2), (1, 2, 1), (v1_config, v2_config, v3_config)
     ):
+        soft_start_dc_offset.append(
+            config.dc_offset - config.signal[0]
+        )  # DC offset when the soft start begins
+        final_dc_offset.append(
+            config.dc_offset
+        )  # DC offset when the soft start ends (i.e. the actual DC offset of the waveform)
+
         # Configure the current channel for the current wave generator, based on the current configuration information
 
         output_waveform_type = OutputWaveformType(f"ARB{channel}")
@@ -183,7 +207,7 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
         awg.set_waveform_shape(WaveformShape.ARB)  # Select "ARB" waveform
         awg.set_amplitude(config.amplitude)  # Amplitude [Vpp]
         awg.set_output_load(config.output_load)  # Output load
-        awg.set_dc_offset(config.dc_offset)  # DC offset
+        awg.set_dc_offset(soft_start_dc_offset[-1])  # DC offset (soft start)
         awg.set_frequency(frequency)  # Frequency [Hz]
         awg.define_arb_waveform(output_waveform_type, config.name, Output.OFF)
         awg.load_arb1_ascii(
@@ -199,6 +223,31 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
         awg.set_burst_trigger_source(TriggerSource.EXTERNAL)
         awg.set_burst(Burst.GATED)
         awg.set_output(Output.ON)
+
+    # Soft start -> Linear increase in DC offset
+
+    soft_start_setup = wave_generators_setup.piezo_tests.soft_start
+    num_steps = soft_start_setup.num_steps
+    delta_time = soft_start_setup.time / num_steps
+
+    time.sleep(
+        soft_start_setup.delay
+    )  # Wait between enabling the channel output and the soft start
+
+    soft_start_dc_offset = [
+        np.linspace(start, end, num_steps)
+        for start, end in zip(soft_start_dc_offset, final_dc_offset)
+    ]
+
+    for dc_offset_v1, dc_offset_v2, dc_offset_v3 in zip(*soft_start_dc_offset):
+        awg1.set_channel(1)
+        awg1.set_dc_offset(dc_offset_v1)
+        awg1.set_channel(2)
+        awg1.set_dc_offset(dc_offset_v2)
+        awg2.set_channel(1)
+        awg2.set_dc_offset(dc_offset_v3)
+
+        time.sleep(delta_time)
 
     # External trigger, coming from the Raspberry Pi -> Start waveform generation
 
