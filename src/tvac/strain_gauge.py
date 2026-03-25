@@ -545,16 +545,15 @@ def _on_stream_data(
                 _rotate_csv(channel_names)
 
     if metrics_enabled:
-        points = [
-            {
-                "measurement": ORIGIN.lower(),
-                "time": ts,
-                "fields": dict(zip(channel_names, row)),
-            }
-            for ts, row in zip(timestamps, readings)
-        ]
+        df = pd.DataFrame(readings, columns=channel_names)
+        df["time"] = timestamps
+        df.set_index("time", inplace=True)
+
         try:
-            metrics_client.write(points)
+            metrics_client.write(
+                record=df,
+                data_frame_measurement_name=ORIGIN.lower(),
+            )
         except Exception as exc:
             global _metrics_write_failed
             if not _metrics_write_failed:
