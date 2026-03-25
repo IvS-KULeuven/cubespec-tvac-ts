@@ -552,7 +552,7 @@ def _on_stream_data(
         try:
             metrics_client.write(
                 df,
-                data_frame_measurement_name=ORIGIN.lower(),
+                measurement_name=ORIGIN.lower(),
             )
         except Exception as exc:
             global _metrics_write_failed
