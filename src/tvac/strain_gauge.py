@@ -550,9 +550,8 @@ def _on_stream_data(
         df.set_index("time", inplace=True)
 
         try:
-            metrics_client.write(
-                df,
-                measurement_name=ORIGIN.lower(),
+            metrics_client.write_dataframe(
+                df, measurement=ORIGIN.lower(), timestamp_column="time"
             )
         except Exception as exc:
             global _metrics_write_failed
