@@ -551,7 +551,7 @@ def _on_stream_data(
 
         try:
             metrics_client.write(
-                record=df,
+                df,
                 data_frame_measurement_name=ORIGIN.lower(),
             )
         except Exception as exc:
