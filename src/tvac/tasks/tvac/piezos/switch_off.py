@@ -15,12 +15,11 @@ ICON_PATH = HERE / "icons/"
 def switch_off_piezos() -> None:
     """Switches off the Wave Generators."""
 
-    try:
-        start_observation("Switch off wave generation for piezo actuators")
+    start_observation("Switch off wave generation for piezo actuators")
 
-        try:
-            switch_off_awg(setup=load_setup())
-        except Exception as e:
-            print(f"Failed to switch off wave generation for piezo actuators: {e}")
-    finally:
-        end_observation()
+    try:
+        switch_off_awg(setup=load_setup())
+    except Exception as e:
+        print(f"Failed to switch off wave generation for piezo actuators: {e}")
+
+    end_observation()

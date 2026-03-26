@@ -23,19 +23,16 @@ def load_profile(
         profile: Voltage profile.
     """
 
+    start_observation("Configure + switch on wave generators, using profile {profile}")
+
     try:
-        start_observation(
-            "Configure + switch on wave generators, using profile {profile}"
+        load_voltage_profile(profile=profile, setup=load_setup())
+    except Exception as e:
+        print(
+            f"Failed to configure + switch on wave generators, using profile {profile}: {e}"
         )
 
-        try:
-            load_voltage_profile(profile=profile, setup=load_setup())
-        except Exception as e:
-            print(
-                f"Failed to configure + switch on wave generators, using profile {profile}: {e}"
-            )
-    finally:
-        end_observation()
+    end_observation()
 
 
 @exec_ui(display_name="Plot profile", use_kernel=True)
