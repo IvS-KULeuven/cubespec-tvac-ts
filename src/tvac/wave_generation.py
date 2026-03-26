@@ -42,7 +42,7 @@ class ArbConfig:
         self._amplitude = float(np.max(signal) - np.min(signal))  # Amplitude [V]
         # noinspection PyUnresolvedReferences
         self._dc_offset = float(
-            (np.max(signal) - np.min(signal)) / 2.0
+            (np.max(signal) + np.min(signal)) / 2.0
         )  # DC offset [V]
         self._output_load = output_load  # Output load [Ω]
 
