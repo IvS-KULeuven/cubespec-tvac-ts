@@ -60,24 +60,22 @@ def switch_off_heater(heater: Callback(heaters_incl_all, name="Heater") = None) 
         heater: Name of the heater.
     """
 
-    try:
-        setup = load_setup()
+    setup = load_setup()
 
-        if heater.startswith("H"):
-            start_observation(f"Switch off heater {heater}")
+    if heater.startswith("H"):
+        start_observation(f"Switch off heater {heater}")
 
+        try:
+            switch_off_psu(heater_name=heater, setup=setup)
+        except Exception as e:
+            print(f"Failed to switch off heater {heater}: {e}")
+
+    else:
+        start_observation(f"Switch off all heaters")
+
+        for heater_name in heaters():
             try:
-                switch_off_psu(heater_name=heater, setup=setup)
+                switch_off_psu(heater_name=heater_name, setup=setup)
             except Exception as e:
-                print(f"Failed to switch off heater {heater}: {e}")
-
-        else:
-            start_observation(f"Switch off all heaters")
-
-            for heater_name in heaters():
-                try:
-                    switch_off_psu(heater_name=heater_name, setup=setup)
-                except Exception as e:
-                    print(f"Failed to switch off heater {heater_name}: {e}")
-    finally:
-        end_observation()
+                print(f"Failed to switch off heater {heater_name}: {e}")
+    end_observation()
