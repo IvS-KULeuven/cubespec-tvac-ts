@@ -489,7 +489,6 @@ def _rotate_csv(headers):
 
 def _on_stream_data(
     *,
-    metrics_client=None,
     timestamps,
     readings,
     channel_names,
