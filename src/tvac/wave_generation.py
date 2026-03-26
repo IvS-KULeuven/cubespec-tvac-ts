@@ -236,12 +236,12 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
         soft_start_setup.delay
     )  # Wait between enabling the channel output and the soft start
 
-    soft_start_dc_offset = [
+    soft_start_dc_offset_grid = [
         np.linspace(start, end, num_steps)
         for start, end in zip(soft_start_dc_offset, final_dc_offset)
     ]
 
-    for dc_offset_v1, dc_offset_v2, dc_offset_v3 in zip(*soft_start_dc_offset):
+    for dc_offset_v1, dc_offset_v2, dc_offset_v3 in zip(*soft_start_dc_offset_grid):
         awg1.set_channel(1)
         awg1.set_dc_offset(dc_offset_v1)
         awg1.set_channel(2)
