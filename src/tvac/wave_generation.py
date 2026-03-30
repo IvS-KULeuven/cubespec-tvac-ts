@@ -38,12 +38,14 @@ class ArbConfig:
         self._name = name
 
         self._frequency = frequency  # Frequency [Hz]
-        # noinspection PyUnresolvedReferences
-        self._amplitude = float(np.max(signal) - np.min(signal))  # Amplitude [V]
-        # noinspection PyUnresolvedReferences
-        self._dc_offset = float(
-            (np.max(signal) + np.min(signal)) / 2.0
-        )  # DC offset [V]
+        self._amplitude = float(np.max(signal))
+        self._dc_offset = float(np.max(signal) / 2.)
+        # # noinspection PyUnresolvedReferences
+        # self._amplitude = float(np.max(signal) - np.min(signal))  # Amplitude [V]
+        # # noinspection PyUnresolvedReferences
+        # self._dc_offset = float(
+        #     (np.max(signal) + np.min(signal)) / 2.0
+        # )  # DC offset [V]
         self._output_load = output_load  # Output load [Ω]
 
         self._signal = signal
@@ -125,7 +127,8 @@ class ArbConfig:
 
         # Map to signed 16-bit integer (in the range [-32767, 32767])
 
-        min_signal, max_signal = np.min(self.signal), np.max(self.signal)
+        # min_signal, max_signal = np.min(self.signal), np.max(self.signal)
+        min_signal, max_signal = 0, np.max(self.signal)
         signal16 = (self.signal - min_signal) / (max_signal - min_signal) * (
             65535 - 1
         ) - (65535 // 2)
