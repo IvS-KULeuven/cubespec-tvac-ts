@@ -379,6 +379,7 @@ def characterize_piezo(
                     awg.set_waveform_shape(WaveformShape.ARB)
                     awg.set_arb_waveform(OutputWaveformType.DC)
                     awg.set_dc_offset(fixed_voltage)
+                    awg.set_output_load(output_load)
 
                     awg.set_output(Output.ON)
 
