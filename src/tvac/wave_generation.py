@@ -184,9 +184,8 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
             awg: Tgf4000Interface = awg_info.device
             awg.reconnect()  # Mitigate possible connection issues (#54)
 
-            awg_list.append(awg)
-
             for piezo_name, channel in awg_info.piezo_channels.items():
+                awg_list.append(awg)
                 channel_list.append(channel)
 
     # Extract the voltage profiles for the piezo actuators
