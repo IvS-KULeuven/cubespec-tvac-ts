@@ -127,8 +127,8 @@ class ArbConfig:
 
         # Map to signed 16-bit integer (in the range [-32767, 32767])
 
-        # min_signal, max_signal = np.min(self.signal), np.max(self.signal)
-        min_signal, max_signal = 0, np.max(self.signal)
+        min_signal, max_signal = np.min(self.signal), np.max(self.signal)
+        # min_signal, max_signal = 0, np.max(self.signal)
         signal16 = (self.signal - min_signal) / (max_signal - min_signal) * (
             65535 - 1
         ) - (65535 // 2)
