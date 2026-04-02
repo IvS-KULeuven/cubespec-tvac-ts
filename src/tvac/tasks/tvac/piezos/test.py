@@ -77,7 +77,7 @@ def ramp(
 ) -> None:
     """Switches off the Wave Generators."""
 
-    start_observation("Switch off wave generation for piezo actuators")
+    start_observation("Ramp for piezo actuators")
 
     try:
         wave_generation.ramp(amplitude, period, piezo_list, setup=load_setup())
