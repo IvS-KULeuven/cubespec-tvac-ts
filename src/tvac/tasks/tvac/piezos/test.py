@@ -71,9 +71,9 @@ def sine_sweep(
 @exec_ui(display_name="Ramp", use_kernel=True)
 # def ramp(amplitude: float = 10, period: float = 10, piezo_list: PiezoList([Callback(piezos, name="Piezo actuator")], ["V1_V"])= None)-> None:
 def ramp(
-    amplitude: float,
-    period: float,
-    piezo_list: ListList([Callback(piezos, name="Piezo actuator")], ["V1_V"]),
+    amplitude: float = 0.5,
+    period: float = 10,
+    piezo_list: ListList([str], ["V1_V"]) = None,
 ) -> None:
     """Switches off the Wave Generators."""
 
