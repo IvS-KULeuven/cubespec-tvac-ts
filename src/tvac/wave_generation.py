@@ -426,6 +426,7 @@ def ramp(
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
         period (float): Period of the ramp [s].
+        piezo_list (list[str]): List of piezo actuator names.
         setup (Setup): Setup from which to extract the information from the piezo actuators and corresponding Wave
                        Generators.
     """
@@ -463,9 +464,15 @@ def ramp(
         awg.set_burst_count(1)
         awg.set_output(Output.ON)
 
+        start_time = time.monotonic()
+
         start_signal_trigger()
         time.sleep(1)
         stop_signal_trigger()
+
+        while (time.monotonic() - start_time) < period:
+            time.sleep(0.5)
+
         awg.set_output(Output.OFF)
 
 
