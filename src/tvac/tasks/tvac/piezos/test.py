@@ -1,3 +1,5 @@
+from itertools import chain
+
 from egse.observation import start_observation, end_observation
 from egse.setup import load_setup
 from gui_executor.exec import exec_ui
@@ -80,9 +82,14 @@ def ramp(
     start_observation("Ramp for piezo actuators")
 
     try:
-        wave_generation.ramp(amplitude, period, piezo_list, setup=load_setup())
+        wave_generation.ramp(
+            amplitude=amplitude,
+            period=period,
+            piezo_list=list(chain.from_iterable(piezo_list)),
+            setup=load_setup(),
+        )
     except Exception as e:
-        print(f"Failed to switch off wave generation for piezo actuators: {e}")
+        print(f"Failed to run a ramp for piezo actuators: {e}")
 
     end_observation()
 
