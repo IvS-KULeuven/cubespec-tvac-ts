@@ -11,14 +11,14 @@ from egse.log import egse_logger
 
 multiprocessing.current_process().name = "update_tvac"
 
-from egse.system import chdir, get_module_location
+from egse.system import chdir
 
 THIS_FILE_LOCATION = Path(__file__).parent
 ROOT_PROJECT_FOLDER = THIS_FILE_LOCATION / "../.."
 
 # Make sure the logging messages are also send to the log_cs
 
-CAMTEST_LOGGER = egse_logget
+EGSE_LOGGER = egse_logger
 MODULE_LOGGER = logging.getLogger("tvac.scripts")
 
 
