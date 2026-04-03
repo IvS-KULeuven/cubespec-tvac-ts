@@ -32,6 +32,7 @@ dependencies = [
     "pytz",
     "scipy>=1.15.3",
     "pigpio",
+    "invoke",
 ]
 
 [project.entry-points."navdict.directive"]
