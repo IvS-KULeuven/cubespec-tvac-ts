@@ -463,6 +463,7 @@ def ramp(
         start_signal_trigger()
         time.sleep(1)
         stop_signal_trigger()
+        awg.set_output(Output.OFF)
 
 
 @building_block
