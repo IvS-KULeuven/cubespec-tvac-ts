@@ -447,13 +447,16 @@ def ramp(
         awg, channel = info[piezo]
 
         awg.set_channel(channel)
-        awg.set_waveform_shape(WaveformShape.RAMP)
+        awg.set_waveform_shape(WaveformShape.ARB)  # FIXME
         awg.set_amplitude(amplitude)
-        awg.set_dc_offset(0)
+        awg.set_dc_offset(amplitude / 2.0)
         awg.set_output_load(
             wave_generators_setup.piezo_tests.output_load
         )  # Output load
         awg.set_period(period)  # Period [s]
+
+        output_waveform_type = OutputWaveformType.TRIANGULAR
+        awg.set_arb_waveform(output_waveform_type)
 
         awg.set_burst_trigger_source(TriggerSource.EXTERNAL)
         awg.set_burst(Burst.NCYC)
