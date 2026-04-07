@@ -63,7 +63,7 @@ _metrics_write_failed = False
 _metrics_sender: MetricsHubSender | None = None
 
 # Plot flag
-_plot_enabled = True
+_plot_enabled = False
 _plot_keep_seconds = 60.0
 
 # Runtime overrides applied on top of the Setup values. These overrides are
@@ -85,7 +85,7 @@ _cached_channel_settings: dict[str, dict[str, object]] = {
         "resolution_index": 0,
     },
     "SG_AIN2": {
-        "enabled": True,
+        "enabled": False,
         "ain_channel": 2,
         "voltage_range": 0.1,
         "neg_voltage_range": 10.0,
@@ -536,7 +536,7 @@ def _on_stream_data(
 
             _read_count += 1
             if _read_count % 10 == 0:
-                print(
+                _sg_debug(
                     f"Read #{_read_count}: {len(timestamps)} scans | "
                     f"Device backlog: {device_backlog} | LJM backlog: {ljm_backlog}"
                 )
