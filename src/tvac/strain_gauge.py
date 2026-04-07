@@ -85,7 +85,7 @@ _cached_channel_settings: dict[str, dict[str, object]] = {
         "resolution_index": 0,
     },
     "SG_AIN2": {
-        "enabled": True,
+        "enabled": False,
         "ain_channel": 2,
         "voltage_range": 0.1,
         "neg_voltage_range": 10.0,
