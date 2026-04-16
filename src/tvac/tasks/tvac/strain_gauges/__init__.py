@@ -15,6 +15,29 @@ def strain_gauges() -> List[str]:
     return list(setup.gse.labjack_t7.channels.keys())
 
 
+def ain_channels() -> List[str]:
+    """List of AIN channels."""
+
+    setup = load_setup()
+
+    return list(setup.gse.labjack_t7.channels.keys())
+
+
+def voltage_ranges() -> List[float]:
+    """List of voltage ranges for the strain gauges.
+
+    These are both the positive and negative voltage ranges/
+    """
+
+    return [0.01, 0.1, 1.0, 10.0]
+
+
+def resolution_indices() -> List[int]:
+    """List of resolution indices for the strain gauges."""
+
+    return [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+
 # Stream callbacks
 
 

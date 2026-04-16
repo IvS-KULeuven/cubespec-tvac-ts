@@ -29,6 +29,9 @@ from tvac.tasks.tvac.strain_gauges import (
     sg_plot_window_seconds,
     sg_resync_interval_s,
     sg_scan_rate,
+    strain_gauges,
+    voltage_ranges,
+    resolution_indices,
 )
 
 UI_MODULE_DISPLAY_NAME = "1 - Strain Gauges"
@@ -147,34 +150,36 @@ def settings() -> None:
     print(get_sg_settings())
 
 
-@exec_ui(display_name="Configure SG channel", use_kernel=True)
-def configure_sg_channel(
-    config: SGChannelConfig(name="SG / AIN / Range / Resolution") = None,
+# noinspection PyTypeHints
+@exec_ui(display_name="Configure channel", use_kernel=True)
+def configure_sg_channels(
+    sg_name: Callback(strain_gauges, name="Strain gauge") = None,
+    enabled: bool = True,
+    pos_voltage_range: Callback(
+        voltage_ranges, name="Positive voltage range [V]"
+    ) = None,
+    neg_voltage_range: Callback(
+        voltage_ranges, name="Negative voltage range [V]"
+    ) = None,
+    resolution_index: Callback(resolution_indices, name="Resolution index") = None,
 ) -> None:
-    """Set runtime overrides for one SG channel (applied on next Start logging)."""
-    try:
-        cfg = config or {}
-        name = str(cfg.get("sg_name", "")).strip()
-        if not name:
-            available = get_sg_channel_names()
-            if not available:
-                raise ValueError("No SG channels were found in the setup.")
-            name = available[0]
-            print(f"sg_name was empty, using first setup SG channel: {name}")
+    setup = load_setup()
+    sg_setup = setup.gse.labjack_t7.channels[sg_name]
 
-        set_sg_channel_runtime_settings(
-            sg_name=name,
-            enabled=bool(cfg.get("enabled", True)),
-            ain_channel=int(cfg.get("ain_channel", 0)),
-            voltage_range=float(cfg.get("voltage_range", 0.1)),
-            resolution_index=int(cfg.get("resolution_index", 0)),
-        )
-        print(f"Runtime channel settings updated for {name}.")
-        print(get_sg_settings())
-    except Exception as e:
-        print(f"Failed to configure SG channel settings: {e}")
+    set_sg_channel_runtime_settings(
+        sg_name=sg_name,
+        enabled=enabled,
+        ain_channel=sg_setup.ain_channel,
+        voltage_range=pos_voltage_range,
+        neg_voltage_range=neg_voltage_range,
+        resolution_index=resolution_index,
+        setup=setup,
+    )
+    print(f"Runtime channel settings updated for {sg_name}.")
+    print(get_sg_settings())
 
 
+# noinspection PyTypeHints
 @exec_ui(display_name="Configure stream", use_kernel=True)
 def configure_stream(
     scan_rate: Callback(sg_scan_rate, name="Scan rate [Hz]") = None,
@@ -196,6 +201,7 @@ def configure_stream(
         print(f"Failed to configure stream settings: {e}")
 
 
+# noinspection PyTypeHints
 @exec_ui(display_name="Configure CSV", use_kernel=True)
 def configure_csv(
     enabled: Callback(sg_csv_enabled, name="Enable CSV logging") = None,
@@ -233,6 +239,7 @@ def config_metrics(enabled: bool = True) -> None:
         print(f"Failed to configure metrics settings: {e}")
 
 
+# noinspection PyTypeHints
 @exec_ui(display_name="Configure plot", use_kernel=True)
 def configure_plot(
     enabled: Callback(sg_plot_enabled, name="Enable plot") = None,
