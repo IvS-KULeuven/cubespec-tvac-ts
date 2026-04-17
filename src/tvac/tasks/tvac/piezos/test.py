@@ -1,12 +1,13 @@
-from itertools import chain
-
+import time
 from egse.observation import start_observation, end_observation
 from egse.setup import load_setup
 from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback, ListList
+from itertools import chain
 
 from tvac import wave_generation
-from tvac.tasks.tvac.piezos import piezos
+from tvac.strain_gauge import enable_sg_logging, disable_sg_logging
+from tvac.tasks.tvac.piezos import piezos, sine_sweep_sg_scan_rate
 from tvac.tasks.tvac.piezos import (
     sine_sweep_amplitude,
     sine_sweep_dc_offset,
@@ -15,10 +16,12 @@ from tvac.tasks.tvac.piezos import (
     sine_sweep_time,
     sine_sweep_fixed_voltage,
 )
+from tvac.tasks.tvac.strain_gauges import strain_gauges
 
 UI_MODULE_DISPLAY_NAME = "1 - Test"
 
 
+# noinspection PyTypeHints
 @exec_ui(display_name="Sine sweep", use_kernel=True)
 def sine_sweep(
     piezo: Callback(piezos, name="Piezo actuator to sweep") = None,
@@ -38,11 +41,23 @@ def sine_sweep(
     fixed_voltage: Callback(
         sine_sweep_fixed_voltage, name="Constant voltage (other piezos) [Vdc]"
     ) = None,
+    strain_gauge: Callback(strain_gauges, name="Strain gauge to monitor") = None,
+    scan_rate: Callback(
+        sine_sweep_sg_scan_rate, name="Scan rate for strain gauge [Hz]"
+    ) = None,
 ):
-    """Performs a sine sweep of the given piezo actuator, while keeping the others as a fixed voltage.
+    """Performs a single sine sweep of the given piezo actuator, while keeping the others as a fixed voltage.
 
-    For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators, we
-    configure a constant voltage.
+    Within the context of an observation, we perform the following steps:
+
+        - Interrupt all logging from the LabJack, to ensure a clean logging of the requested strain gauge.
+        - Configure + start logging of the requested strain gauge at the requested scan rate (all other configuration
+          parameters are taken from the setup).
+        - For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators,
+          we configure a constant voltage.
+        - Sleep for the requested duration of the sine sweep (we should only cover a single sine sweep).
+        - Stop the wave generation.
+        - Stop the logging of the requested strain gauge (disable + reset its parameters).
 
     Args:
         piezo: Name of the piezo actuator for which to configure a frequency sweep.
@@ -52,9 +67,19 @@ def sine_sweep(
         stop_frequency (float): Stop frequency for the frequency sweep [Hz].
         sweep_time (float): Frequency sweep time [s].
         fixed_voltage (float): Fixed voltage for the other piezo actuators.
+        strain_gauge (StrainGauge): Strain gauge to monitor.
+        scan_rate (float): Scan rate for the monitored strain gauge [Hz].
     """
 
     start_observation(f"Sine sweep for piezo actuator {piezo}")
+
+    setup = load_setup()
+
+    # Configure + enable the logging of the requested strain gauge
+
+    enable_sg_logging(sg_name=strain_gauge, scan_rate=scan_rate, setup=setup)
+
+    # Configure and initiate the sine sweep
 
     wave_generation.sine_sweep(
         piezo=piezo,
@@ -64,12 +89,25 @@ def sine_sweep(
         stop_frequency=stop_frequency,
         sweep_time=sweep_time,
         fixed_voltage=fixed_voltage,
-        setup=load_setup(),
+        setup=setup,
     )
+
+    # Let the sine sweep go on for the requested duration
+
+    time.sleep(sweep_time)
+
+    # Stop the sine sweep
+
+    wave_generation.switch_off_awg(setup)
+
+    # Disable the logging of the strain gauges
+
+    disable_sg_logging()
 
     end_observation()
 
 
+# noinspection PyTypeHints
 @exec_ui(display_name="Ramp", use_kernel=True)
 # def ramp(amplitude: float = 10, period: float = 10, piezo_list: PiezoList([Callback(piezos, name="Piezo actuator")], ["V1_V"])= None)-> None:
 def ramp(
