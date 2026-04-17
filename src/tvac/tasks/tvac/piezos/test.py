@@ -77,7 +77,7 @@ def sine_sweep(
 
     # Interrupt ongoing logging
 
-    disable_sg_logging()
+    disable_sg_logging(setup=setup)
 
     # Configure + enable the logging of the requested strain gauge
 
@@ -102,11 +102,11 @@ def sine_sweep(
 
     # Stop the sine sweep
 
-    wave_generation.switch_off_awg(setup)
+    wave_generation.switch_off_awg(setup=setup)
 
     # Disable the logging of the strain gauges
 
-    disable_sg_logging()
+    disable_sg_logging(setup=setup)
 
     end_observation()
 
