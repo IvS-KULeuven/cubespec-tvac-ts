@@ -94,7 +94,7 @@ def sine_sweep(
 
     # Let the sine sweep go on for the requested duration
 
-    time.sleep(sweep_time)
+    time.sleep(float(sweep_time))
 
     # Stop the sine sweep
 
