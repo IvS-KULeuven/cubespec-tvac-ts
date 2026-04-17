@@ -77,6 +77,10 @@ def sine_sweep(
         setup=setup,
     )
 
+    # Let the sine sweep go on for the requested duration
+
+    time.sleep(sweep_time)
+
     end_observation()
 
 
