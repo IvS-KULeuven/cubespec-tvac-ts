@@ -18,6 +18,8 @@ from egse.observation import building_block
 from egse.settings import Settings
 from egse.setup import load_setup, Setup
 
+from tvac.strain_gauge import disable_sg_logging, enable_sg_logging, disable_sg_channels
+
 TRIGGER_SETTINGS = Settings.load("Aim-TTi TGF4000").get("TRIGGER")
 
 
@@ -309,6 +311,84 @@ def extract_awg_config_from_setup(profile: str, setup: Setup = None):
 @building_block
 def sine_sweep(
     piezo: str,
+    amplitude: float = 0.2,
+    dc_offset: float = 0.15,
+    start_frequency: float = 1.0,
+    stop_frequency: float = 1500.0,
+    sweep_time: float = 40.0,
+    fixed_voltage: float = 0.15,
+    strain_gauge: str = None,
+    scan_rate: float = 7500.0,
+    setup: Setup = None,
+):
+    """Performs a single sine sweep of the given piezo actuator, while keeping the others as a fixed voltage.
+
+    Within the context of an observation, we perform the following steps:
+
+        - Interrupt all logging from the LabJack, to ensure a clean logging of the requested strain gauge.
+        - Configure + start logging of the requested strain gauge at the requested scan rate (all other configuration
+          parameters are taken from the setup).
+        - For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators,
+          we configure a constant voltage.
+        - Sleep for the requested duration of the sine sweep (we should only cover a single sine sweep).
+        - Stop the wave generation.
+        - Stop the logging of the requested strain gauge (disable + reset its parameters).
+
+    Args:
+        piezo: Name of the piezo actuator for which to configure a frequency sweep.
+        amplitude (float): Amplitude for the frequency sweep [Vpp].
+        dc_offset (float): DC offset for the frequency sweep [Vdc].
+        start_frequency (float): Start frequency for the frequency sweep [Hz].
+        stop_frequency (float): Stop frequency for the frequency sweep [Hz].
+        sweep_time (float): Frequency sweep time [s].
+        fixed_voltage (float): Fixed voltage for the other piezo actuators.
+        strain_gauge (StrainGauge): Strain gauge to monitor.
+        scan_rate (float): Scan rate for the monitored strain gauge [Hz].
+        setup (Setup): Setup used for the setup phase of the wave generation.
+    """
+
+    setup = setup or load_setup()
+
+    # Interrupt ongoing logging (this incl. resetting to defaults from the setup)
+    # All channels should be disabled -> This may not be the default behaviour from the setup, so do this explicitly
+
+    disable_sg_logging(setup=setup)
+    disable_sg_channels(setup=setup)
+
+    # Configure + enable the logging of the requested strain gauge
+
+    enable_sg_logging(sg_name=strain_gauge, scan_rate=scan_rate, setup=setup)
+
+    # Configure and initiate the sine sweep (keeps on going until the wave generation is stopped explicitly)
+
+    start_sine_sweep(
+        piezo=piezo,
+        amplitude=amplitude,
+        dc_offset=dc_offset,
+        start_frequency=start_frequency,
+        stop_frequency=stop_frequency,
+        sweep_time=sweep_time,
+        fixed_voltage=fixed_voltage,
+        setup=setup,
+    )
+
+    # Let the sine sweep go on for the requested duration
+
+    time.sleep(float(sweep_time))
+
+    # Stop the wave generation + reset the wave generators
+
+    stop_wave_generation_and_reset(setup=setup)
+
+    # Disable the logging of the strain gauges
+    # We don't explicitly disable the channels but settle for the default behaviour from the setup
+
+    disable_sg_logging(setup=setup)
+
+
+@building_block
+def start_sine_sweep(
+    piezo: str,
     amplitude: float,
     dc_offset: float,
     start_frequency: float,
@@ -317,14 +397,14 @@ def sine_sweep(
     fixed_voltage: float,
     setup: Setup = None,
 ) -> None:
-    """Charactersisation of the given piezo actuator.
+    """Configures and starts sine sweeps of the given piezo actuator, while keeping the others as a fixed voltage.
 
     For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators, we
-    configure a constant voltage.
+    configure a constant voltage.  The sine sweeps keep on going until the wave generation is stopped explicitly.
 
     Because we could not find a way to configure a triggered sweep with an external trigger signal (coming from a
     GPIO pin of a Raspberry Pi being set high), we first enable the channels with a constant voltage and then the
-    frequency sweep.
+    sine sweep.
 
     Args:
         piezo (str): Name of the piezo actuator for which to configure a frequency sweep.
@@ -334,8 +414,7 @@ def sine_sweep(
         stop_frequency (float): Stop frequency for the frequency sweep [Hz].
         sweep_time (float): Frequency sweep time [s].
         fixed_voltage (float): Fixed voltage for the other piezo actuators.
-        setup (Setup): Setup from which to extract the information from the piezo actuators and corresponding Wave
-                       Generators.
+        setup (Setup): Setup.
     """
 
     setup = setup or load_setup()
@@ -357,7 +436,7 @@ def sine_sweep(
                 awg.set_channel(channel)
 
                 if piezo_name == piezo:
-                    sweep_awg = awg
+                    sweep_awg: Tgf4000Interface = awg
                     sweep_channel = channel
 
                     awg.set_waveform_shape(WaveformShape.SINE)
@@ -395,12 +474,44 @@ def ramp(
 ) -> None:
     """Ramps the voltage up and down for one piezo actuator after the other.
 
+    Within the context of an observation, we perform the following steps:
+
+        - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
+          still have to reset the settings of the wave generators.
+        - Stop the wave generation and reset.
+
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
         period (float): Period of the ramp [s].
         piezo_list (list[str]): List of piezo actuator names.
-        setup (Setup): Setup from which to extract the information from the piezo actuators and corresponding Wave
-                       Generators.
+    """
+
+    setup = setup or load_setup()
+
+    # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
+    # reset the wave generators)
+
+    start_ramp(amplitude=amplitude, period=period, piezo_list=piezo_list, setup=setup)
+
+    # Sleeping for the duration of each ramp has already been included in `start_ramp`
+    # Stop the wave generation + reset the wave generators
+
+    stop_wave_generation_and_reset(setup=setup)
+
+
+@building_block
+def start_ramp(
+    amplitude: float, period: float, piezo_list: list[str], setup: Setup = None
+) -> None:
+    """Ramps the voltage up and down for one piezo actuator after the other.
+
+    After that, the wave generation stops, but we still have to reset the settings of the wave generators.
+
+    Args:
+        amplitude (float): Amplitude of the ramp [Vpp].
+        period (float): Period of the ramp [s].
+        piezo_list (list[str]): List of piezo actuator names.
+        setup (Setup): Setup.
     """
 
     setup = setup or load_setup()
@@ -449,7 +560,7 @@ def ramp(
 
 
 @building_block
-def switch_off_awg(setup: Setup = None):
+def stop_wave_generation_and_reset(setup: Setup = None):
     """Switches off the wave generators.
 
     Args:
@@ -577,10 +688,15 @@ def check_trigger() -> None:
     """
 
     if not TRIGGER_SETTINGS:
-        raise AttributeError("No settings for for external trigger")
+        print("No settings found for the external trigger.  Please, check your local settings.")
+        return
 
-    hostname = TRIGGER_SETTINGS["HOSTNAME"]
-    gpio = TRIGGER_SETTINGS["GPIO"]  # BCM numbering
+    if "HOSTNAME" not in TRIGGER_SETTINGS or "GPIO" not in TRIGGER_SETTINGS:
+        print("Both the HOSTNAME and GPIO for the external trigger should be present in the settings file.")
+        return
+
+    hostname: str = TRIGGER_SETTINGS["HOSTNAME"]
+    gpio: int = TRIGGER_SETTINGS["GPIO"]  # BCM numbering
 
     s = socket.socket()
     try:
