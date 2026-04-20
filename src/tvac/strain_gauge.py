@@ -864,7 +864,6 @@ def disable_sg_logging(setup: Setup = None) -> None:
     """
 
     setup = setup or load_setup()
-    sg_setup = setup.gse.labjack_t7.channels
 
     # Stop logging (for all strain gauges)
 
@@ -875,14 +874,19 @@ def disable_sg_logging(setup: Setup = None) -> None:
     reset_sg_runtime_settings()
     reset_sg(setup=setup)
 
-    # Disable all LabJack channels
+@building_block
+def disable_sg_channels(setup: Setup = None) -> None:
+    """Disables all LabJack channels."""
+
+    setup = setup or load_setup()
+    sg_setup = setup.gse.labjack_t7.channels
 
     for sg_name, sg_info in sg_setup.items():
         set_sg_channel_runtime_settings(
             sg_name=sg_name,
             enabled=False,
             ain_channel=sg_info.ain_channel,
-            setup=setup,
+            setup=setup
         )
 
 

@@ -1,4 +1,3 @@
-import time
 from egse.observation import start_observation, end_observation
 from egse.setup import load_setup
 from gui_executor.exec import exec_ui
@@ -6,7 +5,6 @@ from gui_executor.utypes import Callback, ListList
 from itertools import chain
 
 from tvac import wave_generation
-from tvac.strain_gauge import enable_sg_logging, disable_sg_logging
 from tvac.tasks.tvac.piezos import piezos, sine_sweep_sg_scan_rate
 from tvac.tasks.tvac.piezos import (
     sine_sweep_amplitude,
@@ -46,7 +44,7 @@ def sine_sweep(
         sine_sweep_sg_scan_rate, name="Scan rate for strain gauge [Hz]"
     ) = None,
 ):
-    """Performs a single sine sweep of the given piezo actuator, while keeping the others as a fixed voltage.
+    """Performs a single sine sweep of the given piezo actuator, while keeping the others at a fixed voltage.
 
     Within the context of an observation, we perform the following steps:
 
@@ -56,13 +54,13 @@ def sine_sweep(
         - For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators,
           we configure a constant voltage.
         - Sleep for the requested duration of the sine sweep (we should only cover a single sine sweep).
-        - Stop the wave generation.
+        - Stop the wave generation and reset.
         - Stop the logging of the requested strain gauge (disable + reset its parameters).
 
     Args:
         piezo: Name of the piezo actuator for which to configure a frequency sweep.
-        amplitude (str): Amplitude for the frequency sweep [Vpp].
-        dc_offset (str): DC offset for the frequency sweep [Vdc].
+        amplitude (float): Amplitude for the frequency sweep [Vpp].
+        dc_offset (float): DC offset for the frequency sweep [Vdc].
         start_frequency (float): Start frequency for the frequency sweep [Hz].
         stop_frequency (float): Stop frequency for the frequency sweep [Hz].
         sweep_time (float): Frequency sweep time [s].
@@ -71,42 +69,25 @@ def sine_sweep(
         scan_rate (float): Scan rate for the monitored strain gauge [Hz].
     """
 
-    start_observation(f"Sine sweep for piezo actuator {piezo}")
-
-    setup = load_setup()
-
-    # Interrupt ongoing logging
-
-    disable_sg_logging(setup=setup)
-
-    # Configure + enable the logging of the requested strain gauge
-
-    enable_sg_logging(sg_name=strain_gauge, scan_rate=scan_rate, setup=setup)
-
-    # Configure and initiate the sine sweep
-
-    wave_generation.sine_sweep(
-        piezo=piezo,
-        amplitude=amplitude,
-        dc_offset=dc_offset,
-        start_frequency=start_frequency,
-        stop_frequency=stop_frequency,
-        sweep_time=sweep_time,
-        fixed_voltage=fixed_voltage,
-        setup=setup,
+    start_observation(
+        f"Sine sweep for piezo actuator {piezo}, while logging strain gauge {strain_gauge}"
     )
 
-    # Let the sine sweep go on for the requested duration
-
-    time.sleep(float(sweep_time))
-
-    # Stop the sine sweep
-
-    wave_generation.switch_off_awg(setup=setup)
-
-    # Disable the logging of the strain gauges
-
-    disable_sg_logging(setup=setup)
+    try:
+        wave_generation.sine_sweep(
+            piezo=piezo,
+            amplitude=float(amplitude),
+            dc_offset=float(dc_offset),
+            start_frequency=float(start_frequency),
+            stop_frequency=float(stop_frequency),
+            sweep_time=float(sweep_time),
+            fixed_voltage=float(fixed_voltage),
+            strain_gauge=strain_gauge,
+            scan_rate=float(scan_rate),
+            setup=load_setup(),
+        )
+    except Exception as e:
+        print(f"Failed to execute sine sweep for piezo actuator {piezo}: {e}")
 
     end_observation()
 
