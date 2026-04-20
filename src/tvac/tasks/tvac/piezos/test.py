@@ -100,9 +100,23 @@ def ramp(
     period: float = 10,
     piezo_list: ListList([str], ["V1_V"]) = None,
 ) -> None:
-    """Switches off the Wave Generators."""
+    """Ramps the voltage up and down for one piezo actuator after the other.
 
-    start_observation("Ramp for piezo actuators")
+    Within the context of an observation, we perform the following steps:
+
+        - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
+          still have to reset the settings of the wave generators.
+        - Stop the wave generation and reset.
+
+    Args:
+        amplitude (float): Amplitude of the ramp [Vpp].
+        period (float): Period of the ramp [s].
+        piezo_list (list[str]): List of piezo actuator names.
+    """
+
+    start_observation(
+        f"Subsequent voltage ramps (up and down) for piezo actuators {piezo_list}"
+    )
 
     try:
         wave_generation.ramp(
@@ -112,7 +126,9 @@ def ramp(
             setup=load_setup(),
         )
     except Exception as e:
-        print(f"Failed to run a ramp for piezo actuators: {e}")
+        print(
+            f"Failed to ramp voltages up and down for piezo actuators {piezo_list}: {e}"
+        )
 
     end_observation()
 

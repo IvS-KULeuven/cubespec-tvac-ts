@@ -474,12 +474,43 @@ def ramp(
 ) -> None:
     """Ramps the voltage up and down for one piezo actuator after the other.
 
+    Within the context of an observation, we perform the following steps:
+
+        - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
+          still have to reset the settings of the wave generators.
+        - Stop the wave generation and reset.
+
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
         period (float): Period of the ramp [s].
         piezo_list (list[str]): List of piezo actuator names.
-        setup (Setup): Setup from which to extract the information from the piezo actuators and corresponding Wave
-                       Generators.
+    """
+
+    setup = setup or load_setup()
+
+    # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
+    # reset the wave generators)
+
+    start_ramp(amplitude=amplitude, period=period, piezo_list=piezo_list, setup=setup)
+
+    # Stop the wave generation + reset the wave generators
+
+    stop_wave_generation_and_reset(setup=setup)
+
+
+@building_block
+def start_ramp(
+    amplitude: float, period: float, piezo_list: list[str], setup: Setup = None
+) -> None:
+    """Ramps the voltage up and down for one piezo actuator after the other.
+
+    After that, the wave generation stops, but we still have to reset the settings of the wave generators.
+
+    Args:
+        amplitude (float): Amplitude of the ramp [Vpp].
+        period (float): Period of the ramp [s].
+        piezo_list (list[str]): List of piezo actuator names.
+        setup (Setup): Setup.
     """
 
     setup = setup or load_setup()
