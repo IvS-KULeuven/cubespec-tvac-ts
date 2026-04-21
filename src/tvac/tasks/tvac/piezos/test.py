@@ -126,8 +126,8 @@ def ramp(
 
     try:
         wave_generation.ramp(
-            amplitude=amplitude,
-            period=period,
+            amplitude=float(amplitude),
+            period=float(period),
             piezo_list=list(chain.from_iterable(piezo_list)),
             setup=load_setup(),
         )
