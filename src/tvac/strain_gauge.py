@@ -22,6 +22,7 @@ import csv
 import os
 import threading
 from pathlib import Path
+from typing import Any
 
 from egse.observation import building_block, request_obsid
 from egse.system import format_datetime
@@ -69,16 +70,16 @@ _plot_keep_seconds = 60.0
 
 # Runtime overrides applied on top of the Setup values. These overrides are
 # intentionally in-memory only and affect newly started logging sessions.
-_runtime_overrides: dict[str, dict[str, object]] = {
+_runtime_overrides: dict[str, dict[str, Any]] = {
     "stream": {},
     "csv": {},
     "metrics": {},
     "plot": {},
 }
-_runtime_channel_overrides: dict[str, dict[str, object]] = {}
+_runtime_channel_overrides: dict[str, dict[str, Any]] = {}
 _active_channel_labels: list[str] = []
 _cached_channel_names: list[str] = ["SG_AIN0", "SG_AIN2", "SG_AIN4"]
-_cached_channel_settings: dict[str, dict[str, object]] = {
+_cached_channel_settings: dict[str, dict[str, Any]] = {
     "SG_AIN0": {
         "enabled": True,
         "ain_channel": 0,
@@ -164,6 +165,7 @@ def _resolve_csv_save_path(path: str) -> str:
     if candidate.is_absolute():
         return str(candidate)
 
+    # noinspection PyBroadException
     try:
         storage_root = Path(get_data_storage_location()).expanduser()
         daily_stamp = format_datetime(fmt="%Y%m%d")
@@ -172,8 +174,9 @@ def _resolve_csv_save_path(path: str) -> str:
         return str(candidate)
 
 
-def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
+def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, Any]]:
     """Capture non-channel SG settings from the setup into plain Python data."""
+    # noinspection PyUnresolvedReferences
     cfg = setup.gse.labjack_t7
     return {
         "stream": {
@@ -197,9 +200,10 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, object]]:
     }
 
 
-def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
+def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, Any]]:
     """Capture SG channel definitions from the setup and refresh local caches."""
     global _cached_channel_names, _cached_channel_settings
+    # noinspection PyUnresolvedReferences
     cfg = setup.gse.labjack_t7
     channels: dict[str, dict[str, object]] = {}
     for sg_name in cfg.channels:
@@ -219,7 +223,7 @@ def _snapshot_setup_channels(setup: Setup) -> dict[str, dict[str, object]]:
     return channels
 
 
-def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]:
+def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, Any]]:
     """Return setup-derived stream/CSV/plot settings with runtime overrides."""
     setup = setup or load_setup()
     effective = _snapshot_setup_cfg(setup)
@@ -230,7 +234,7 @@ def _get_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]
 
 def _get_effective_channel_settings(
     setup: Setup = None,
-) -> dict[str, dict[str, object]]:
+) -> dict[str, dict[str, Any]]:
     """Return setup-derived channel settings with per-channel overrides applied."""
     setup = setup or load_setup()
     effective = _snapshot_setup_channels(setup)
@@ -240,7 +244,7 @@ def _get_effective_channel_settings(
     return effective
 
 
-def get_sg_effective_settings(setup: Setup = None) -> dict[str, dict[str, object]]:
+def get_sg_effective_settings(setup: Setup = None) -> dict[str, dict[str, Any]]:
     """Return effective SG settings (Setup values + runtime overrides)."""
     setup = setup or load_setup()
     return {
@@ -259,7 +263,7 @@ def get_cached_sg_channel_names() -> list[str]:
     return list(_cached_channel_names)
 
 
-def get_cached_sg_channel_settings() -> dict[str, dict[str, object]]:
+def get_cached_sg_channel_settings() -> dict[str, dict[str, Any]]:
     """Return GUI-safe cached channel settings with runtime overrides applied.
 
     The GUI process may need to populate widgets without reloading the setup
@@ -400,6 +404,8 @@ def reset_sg_runtime_settings() -> None:
     for section in _runtime_overrides.values():
         section.clear()
     _runtime_channel_overrides.clear()
+
+    # noinspection PyBroadException
     try:
         _snapshot_setup_channels(load_setup())
     except Exception:
@@ -520,7 +526,7 @@ def _on_stream_data(
         metrics_enabled = _metrics_enabled
         plot_enabled = _plot_enabled
         plot_keep_seconds = _plot_keep_seconds
-        logger: LabJackT7Logger = _logger
+        logger: LabJackT7Logger | None = _logger
         sender = _metrics_sender
 
     if csv_enabled:
@@ -533,7 +539,9 @@ def _on_stream_data(
             rows = [
                 [ts.isoformat()] + list(row) for ts, row in zip(timestamps, readings)
             ]
+            # noinspection PyUnresolvedReferences
             _csv_writer.writerows(rows)
+            # noinspection PyUnresolvedReferences
             _csv_file.flush()
 
             _read_count += 1
@@ -702,6 +710,7 @@ def start_sg_logging(setup: Setup = None):
     try:
         logger.start_stream(callback=_on_stream_data)
     except Exception:
+        # noinspection PyBroadException
         try:
             logger.close()
         except Exception:
@@ -750,6 +759,7 @@ def stop_sg_logging():
 
         with _csv_lock:
             if _csv_file:
+                # noinspection PyUnresolvedReferences
                 _csv_file.close()
             _csv_file = None
             _csv_writer = None
@@ -799,6 +809,64 @@ def trim_plot_buffers(keep_seconds: float):
 
 
 @building_block
+def enable_all_sg_logging(setup: Setup = None) -> None:
+    """Enables the logging for the all strain gauge.
+
+    The following steps are performed:
+
+        - For all strain gauges, set the voltage ranges and resolution index (from the setup), and enable its
+          channel,
+        - Enable HK and metrics,
+        - Make sure that the HK ends up in the folder, dedicated to the current observation, and that the filenames
+          also refer to the current observation (since this function is a building block, it can only be run in the
+          context of an observation, so the obsid is guaranteed to be not None),
+        - Start the logging of the LabJack.
+    """
+
+    setup = setup or load_setup()
+
+    # noinspection PyUnresolvedReferences
+    sg_setup_all = setup.gse.labjack_t7.channels
+    # noinspection PyUnresolvedReferences
+    stream_setup = setup.gse.labjack_t7.stream
+
+    # Set the voltage ranges + resolution index (for the requested strain gauge), and enable the channel
+
+    for sg_name in sg_setup_all.channels:
+        sg_setup = sg_setup_all[sg_name]
+
+        set_sg_channel_runtime_settings(
+            sg_name=sg_name,
+            enabled=True,
+            ain_channel=sg_setup.ain_channel,
+            voltage_range=sg_setup.voltage_range,
+            neg_voltage_range=sg_setup.neg_voltage_range,
+            resolution_index=sg_setup.resolution_index,
+            setup=setup,
+        )
+
+    # Configure the runtime settings:
+    #   - Scan rate [Hz]
+    #   - Enable HK + metrics
+
+    obsid = request_obsid()  # Since we're in a building block, this will not be None
+    csv_base_filename = f"{obsid}_{ORIGIN}"
+    csv_save_path = f"{os.environ.get('CUBESPEC_DATA_STORAGE_LOCATION')}/obs/{obsid}"
+
+    set_sg_runtime_settings(
+        scan_rate=stream_setup.scan_rate,
+        resync_interval_s=stream_setup.resync_interval_s,
+        buffer_size=stream_setup.buffer_size,
+        csv_enabled=True,
+        csv_save_path=csv_save_path,
+        csv_base_filename=csv_base_filename,
+        metrics_enabled=True,
+    )
+
+    start_sg_logging(setup=setup)
+
+
+@building_block
 def enable_sg_logging(sg_name: str, scan_rate: float, setup: Setup) -> None:
     """Enables the logging for the given strain gauge.
 
@@ -816,7 +884,9 @@ def enable_sg_logging(sg_name: str, scan_rate: float, setup: Setup) -> None:
 
     setup = setup or load_setup()
 
+    # noinspection PyUnresolvedReferences
     sg_setup = setup.gse.labjack_t7.channels[sg_name]
+    # noinspection PyUnresolvedReferences
     stream_setup = setup.gse.labjack_t7.stream
 
     # Set the voltage ranges + resolution index (for the requested strain gauge), and enable the channel
@@ -879,6 +949,7 @@ def disable_sg_channels(setup: Setup = None) -> None:
     """Disables all LabJack channels."""
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     sg_setup = setup.gse.labjack_t7.channels
 
     for sg_name, sg_info in sg_setup.items():
@@ -899,6 +970,7 @@ def reset_sg(setup: Setup = None) -> None:
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     lj_setup = setup.gse.labjack_t7
     stream_setup = lj_setup.stream
     csv_setup = lj_setup.csv

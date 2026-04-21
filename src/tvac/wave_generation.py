@@ -18,9 +18,15 @@ from egse.observation import building_block
 from egse.settings import Settings
 from egse.setup import load_setup, Setup
 
-from tvac.strain_gauge import disable_sg_logging, enable_sg_logging, disable_sg_channels
+from tvac.strain_gauge import (
+    disable_sg_logging,
+    enable_sg_logging,
+    disable_sg_channels,
+    enable_all_sg_logging,
+)
 
-TRIGGER_SETTINGS = Settings.load("Aim-TTi TGF4000").get("TRIGGER")
+# noinspection PyTypeChecker
+TRIGGER_SETTINGS: dict = Settings.load("Aim-TTi TGF4000").get("TRIGGER")
 
 
 class ArbConfig:
@@ -129,7 +135,7 @@ class ArbConfig:
 
         # Map to signed 16-bit integer (in the range [-32767, 32767])
 
-        min_signal, max_signal = np.min(self.signal), np.max(self.signal)
+        min_signal, max_signal = float(np.min(self.signal)), float(np.max(self.signal))
         # min_signal, max_signal = 0, np.max(self.signal)
         signal16 = (self.signal - min_signal) / (max_signal - min_signal) * (
             65535 - 1
@@ -176,7 +182,9 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     wave_generators_setup = setup.gse.wave_generators
+    # noinspection PyUnresolvedReferences
     min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
 
     awg_list = []
@@ -210,6 +218,11 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
                 f"supported"
             )
 
+    # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
+    # default configuration (except for the output folder and filenames: these should pertain to the obsid)
+
+    disable_sg_logging(setup=setup)
+    enable_all_sg_logging(setup=setup)
 
     # We will configure all channels with the requested voltage profile (arbitrary waveform).  Have a look at #52 on
     # more information how this works.
@@ -238,11 +251,11 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
         awg.set_dc_offset(soft_start_dc_offset[-1])  # DC offset (soft start)
         awg.set_frequency(frequency)  # Frequency [Hz]
         awg.define_arb_waveform(output_waveform_type, config.name, Output.OFF)
-        awg.load_arb1_ascii(
-            config.get_signal_as_hex()
-        ) if channel == 1 else awg.load_arb2_ascii(
-            config.get_signal_as_hex()
-        )  # Waveform shape
+        # Waveform shape
+        if channel == 1:
+            awg.load_arb1_ascii(config.get_signal_as_hex())
+        else:
+            awg.load_arb2_ascii(config.get_signal_as_hex())
         time.sleep(2.5)
         awg.set_arb_waveform(output_waveform_type)
 
@@ -276,8 +289,14 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
 
     # External trigger, coming from the Raspberry Pi -> Start waveform generation
 
+    # noinspection PyUnresolvedReferences
     time.sleep(setup.gse.wave_generators.piezo_tests.trigger_delay)
     start_signal_trigger()
+
+    # This is the end of the building block and potentially of the observation
+    #   - Since the observation stopped, it will be possible to start a new one (e.g. to command the heaters)
+    #   - The logging doesn't know the observation has stopped and will continue to write its data to the folder of that
+    #     observation, until the logging is interrupted and the defaults are restored.
 
 
 def extract_awg_config_from_setup(profile: str, setup: Setup = None):
@@ -293,12 +312,13 @@ def extract_awg_config_from_setup(profile: str, setup: Setup = None):
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     calibration = setup.gse.wave_generators.piezo_tests
 
     # noinspection PyUnresolvedReferences
     output_load = calibration.output_load
     # noinspection PyUnresolvedReferences
-    profile = calibration.profiles[profile]
+    profile: dict = calibration.profiles[profile]
     frequency = profile["frequency"]
 
     v1_config = ArbConfig(
@@ -363,6 +383,7 @@ def sine_sweep(
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
 
     if not min_voltage <= fixed_voltage <= max_voltage:
@@ -456,11 +477,12 @@ def start_sine_sweep(
 
     setup = setup or load_setup()
 
+    # noinspection PyUnresolvedReferences
     wave_generators_setup = setup.gse.wave_generators
     output_load = wave_generators_setup.piezo_tests.output_load
 
-    sweep_awg = None
-    sweep_channel = None
+    sweep_awg: Tgf4000Interface | None = None
+    sweep_channel: int | None = None
 
     # Loop over all wave generators
 
@@ -473,7 +495,7 @@ def start_sine_sweep(
                 awg.set_channel(channel)
 
                 if piezo_name == piezo:
-                    sweep_awg: Tgf4000Interface = awg
+                    sweep_awg = awg
                     sweep_channel = channel
 
                     awg.set_waveform_shape(WaveformShape.SINE)
@@ -501,8 +523,9 @@ def start_sine_sweep(
 
                     # ARB DC cannot be selected when burst is enabled, and vice versa -> Error message -79
 
-    sweep_awg.set_channel(sweep_channel)
-    sweep_awg.set_output(Output.ON)
+    if sweep_awg is not None and sweep_channel is not None:
+        sweep_awg.set_channel(sweep_channel)
+        sweep_awg.set_output(Output.ON)
 
 
 @building_block
@@ -521,9 +544,11 @@ def ramp(
         amplitude (float): Amplitude of the ramp [Vpp].
         period (float): Period of the ramp [s].
         piezo_list (list[str]): List of piezo actuator names.
+        setup (Setup): Setup.
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
 
     if not min_voltage <= amplitude <= max_voltage:
@@ -537,6 +562,12 @@ def ramp(
             f"The amplitude for the voltage ramp has an amplitude of 0Vpp, which is not supported"
         )
 
+    # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
+    # default configuration (except for the output folder and filenames: these should pertain to the obsid)
+
+    disable_sg_logging(setup=setup)
+    enable_all_sg_logging(setup=setup)
+
     # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
     # reset the wave generators)
 
@@ -546,6 +577,11 @@ def ramp(
     # Stop the wave generation + reset the wave generators
 
     stop_wave_generation_and_reset(setup=setup)
+
+    # Disable the logging of the strain gauges
+    # We don't explicitly disable the channels but settle for the default behaviour from the setup
+
+    disable_sg_logging(setup=setup)
 
 
 @building_block
@@ -564,6 +600,7 @@ def start_ramp(
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     wave_generators_setup = setup.gse.wave_generators
 
     info = {}
@@ -617,11 +654,13 @@ def stop_wave_generation_and_reset(setup: Setup = None):
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
     wave_generators_setup = setup.gse.wave_generators
 
     # External trigger, coming from the Raspberry Pi -> Stop waveform generation
 
     stop_signal_trigger()
+    # noinspection PyUnresolvedReferences
     time.sleep(setup.gse.wave_generators.piezo_tests.trigger_delay)
 
     awg1: Tgf4000Interface = wave_generators_setup.awg1.device
@@ -653,7 +692,12 @@ def start_signal_trigger() -> None:
     """
 
     if not TRIGGER_SETTINGS:
-        raise AttributeError("No settings for for external trigger")
+        raise AttributeError("No settings for for external trigger.")
+
+    if "HOSTNAME" not in TRIGGER_SETTINGS or "GPIO" not in TRIGGER_SETTINGS:
+        raise AttributeError(
+            "Both the HOSTNAME and GPIO for the external trigger should be present in the settings file."
+        )
 
     hostname = TRIGGER_SETTINGS["HOSTNAME"]
     gpio = TRIGGER_SETTINGS["GPIO"]  # BCM numbering
@@ -695,7 +739,12 @@ def stop_signal_trigger():
     """
 
     if not TRIGGER_SETTINGS:
-        raise AttributeError("No settings for for external trigger")
+        raise AttributeError("No settings for for external trigger.")
+
+    if "HOSTNAME" not in TRIGGER_SETTINGS or "GPIO" not in TRIGGER_SETTINGS:
+        raise AttributeError(
+            "Both the HOSTNAME and GPIO for the external trigger should be present in the settings file."
+        )
 
     hostname = TRIGGER_SETTINGS["HOSTNAME"]
     gpio = TRIGGER_SETTINGS["GPIO"]  # BCM numbering
