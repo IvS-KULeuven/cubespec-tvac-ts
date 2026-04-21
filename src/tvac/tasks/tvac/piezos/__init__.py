@@ -1,6 +1,7 @@
 from typing import List
 
 from egse.setup import load_setup
+from tvac.runtime_config import no_amplifier_enabled
 
 UI_TAB_DISPLAY_NAME = "Piezo Actuators"
 
@@ -54,7 +55,8 @@ def sine_sweep_amplitude() -> float:
 
 
 def sine_sweep_dc_offset() -> float:
-    return _sine_sweep_param("dc_offset")
+    dc_offset = _sine_sweep_param("dc_offset")
+    return dc_offset * 20.0 if no_amplifier_enabled() else dc_offset
 
 
 def sine_sweep_start_frequency() -> float:
@@ -70,7 +72,8 @@ def sine_sweep_time() -> float:
 
 
 def sine_sweep_fixed_voltage() -> float:
-    return _sine_sweep_param("fixed_voltage")
+    fixed_voltage = _sine_sweep_param("fixed_voltage")
+    return fixed_voltage * 20.0 if no_amplifier_enabled() else fixed_voltage
 
 
 def _sine_sweep_labjack_logging_param(param: str) -> float:
@@ -104,6 +107,10 @@ def _ramp_param(param: str) -> float:
 
 
 def ramp_amplitude() -> float:
+    if no_amplifier_enabled():
+        # We normally wanted 10 V here, but the AWG cannot output this unless the
+        # output load is set to OPEN instead of 50 Ohm.
+        return 5.0
     return _ramp_param("amplitude")
 
 
