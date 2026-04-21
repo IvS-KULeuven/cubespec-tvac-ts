@@ -177,6 +177,7 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
 
     setup = setup or load_setup()
     wave_generators_setup = setup.gse.wave_generators
+    min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
 
     awg_list = []
     channel_list = []
@@ -196,6 +197,20 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     v1_config, v2_config, v3_config, frequency = extract_awg_config_from_setup(
         profile, setup=setup
     )
+
+    for config in (v1_config, v2_config, v3_config):
+        if np.min(config.signal) < min_voltage or np.max(config.signal) > max_voltage:
+            raise ValueError(
+                f"Voltage profile {profile} for piezo actuator {config.name} is outside of the safe range for piezo "
+                f"actuators ({min_voltage} - {max_voltage}V at wave generator level)"
+            )
+        if config.amplitude == 0:
+            raise ValueError(
+                f"Voltage profile {profile} for piezo actuator {config.name} has an amplitude of 0Vpp, which is not "
+                f"supported"
+            )
+
+
     # We will configure all channels with the requested voltage profile (arbitrary waveform).  Have a look at #52 on
     # more information how this works.
 
@@ -348,6 +363,28 @@ def sine_sweep(
     """
 
     setup = setup or load_setup()
+    min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
+
+    if not min_voltage <= fixed_voltage <= max_voltage:
+        raise ValueError(
+            f"Fixed voltage is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V at "
+            f"wave generator level)"
+        )
+
+    if amplitude == 0:
+        raise ValueError(
+            f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not "
+            f"supported"
+        )
+
+    if (
+        dc_offset - amplitude / 2 < min_voltage
+        or dc_offset + amplitude / 2 > max_voltage
+    ):
+        raise ValueError(
+            f"The combination of amplitude and DC offset leads to voltages outside of the safety range for the piezo "
+            f"actuators ({min_voltage} - {max_voltage}V at wave generator level)"
+        )
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup)
     # All channels should be disabled -> This may not be the default behaviour from the setup, so do this explicitly
@@ -487,6 +524,18 @@ def ramp(
     """
 
     setup = setup or load_setup()
+    min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
+
+    if not min_voltage <= amplitude <= max_voltage:
+        raise ValueError(
+            f"Given amplitude is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V "
+            f"at wave generator level)"
+        )
+
+    if amplitude == 0:
+        raise ValueError(
+            f"The amplitude for the voltage ramp has an amplitude of 0Vpp, which is not supported"
+        )
 
     # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
     # reset the wave generators)
@@ -688,11 +737,15 @@ def check_trigger() -> None:
     """
 
     if not TRIGGER_SETTINGS:
-        print("No settings found for the external trigger.  Please, check your local settings.")
+        print(
+            "No settings found for the external trigger.  Please, check your local settings."
+        )
         return
 
     if "HOSTNAME" not in TRIGGER_SETTINGS or "GPIO" not in TRIGGER_SETTINGS:
-        print("Both the HOSTNAME and GPIO for the external trigger should be present in the settings file.")
+        print(
+            "Both the HOSTNAME and GPIO for the external trigger should be present in the settings file."
+        )
         return
 
     hostname: str = TRIGGER_SETTINGS["HOSTNAME"]
