@@ -810,6 +810,65 @@ def trim_plot_buffers(keep_seconds: float):
 
 
 @building_block
+def enable_all_sg_logging(setup: Setup = None) -> None:
+    """Enables the logging for the all strain gauge.
+
+    The following steps are performed:
+
+        - For all strain gauges, set the voltage ranges and resolution index (from the setup), and enable its
+          channel,
+        - Enable HK and metrics,
+        - Make sure that the HK ends up in the folder, dedicated to the current observation, and that the filenames
+          also refer to the current observation (since this function is a building block, it can only be run in the
+          context of an observation, so the obsid is guaranteed to be not None),
+        - Start the logging of the LabJack.
+    """
+
+
+    setup = setup or load_setup()
+
+    # noinspection PyUnresolvedReferences
+    sg_setup_all = setup.gse.labjack_t7.channels
+    # noinspection PyUnresolvedReferences
+    stream_setup = setup.gse.labjack_t7.stream
+
+    # Set the voltage ranges + resolution index (for the requested strain gauge), and enable the channel
+
+    for sg_name in sg_setup_all.channels:
+        sg_setup = sg_setup_all[sg_name]
+
+        set_sg_channel_runtime_settings(
+            sg_name=sg_name,
+            enabled=True,
+            ain_channel=sg_setup.ain_channel,
+            voltage_range=sg_setup.voltage_range,
+            neg_voltage_range=sg_setup.neg_voltage_range,
+            resolution_index=sg_setup.resolution_index,
+            setup=setup,
+        )
+
+    # Configure the runtime settings:
+    #   - Scan rate [Hz]
+    #   - Enable HK + metrics
+
+    obsid = request_obsid()  # Since we're in a building block, this will not be None
+    csv_base_filename = f"{obsid}_{ORIGIN}"
+    csv_save_path = f"{os.environ.get('CUBESPEC_DATA_STORAGE_LOCATION')}/obs/{obsid}"
+
+    set_sg_runtime_settings(
+        scan_rate=stream_setup.scan_rate,
+        resync_interval_s=stream_setup.resync_interval_s,
+        buffer_size=stream_setup.buffer_size,
+        csv_enabled=True,
+        csv_save_path=csv_save_path,
+        csv_base_filename=csv_base_filename,
+        metrics_enabled=True,
+    )
+
+    start_sg_logging(setup=setup)
+
+
+@building_block
 def enable_sg_logging(sg_name: str, scan_rate: float, setup: Setup) -> None:
     """Enables the logging for the given strain gauge.
 
