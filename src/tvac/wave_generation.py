@@ -557,6 +557,12 @@ def ramp(
             f"The amplitude for the voltage ramp has an amplitude of 0Vpp, which is not supported"
         )
 
+    # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
+    # default configuration (except for the output folder and filenames: these should pertain to the obsid)
+
+    disable_sg_logging(setup=setup)
+    enable_all_sg_logging(setup=setup)
+
     # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
     # reset the wave generators)
 
@@ -566,6 +572,11 @@ def ramp(
     # Stop the wave generation + reset the wave generators
 
     stop_wave_generation_and_reset(setup=setup)
+
+    # Disable the logging of the strain gauges
+    # We don't explicitly disable the channels but settle for the default behaviour from the setup
+
+    disable_sg_logging(setup=setup)
 
 
 @building_block
