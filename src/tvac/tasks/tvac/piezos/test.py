@@ -2,7 +2,6 @@ from egse.observation import start_observation, end_observation
 from egse.setup import load_setup
 from gui_executor.exec import exec_ui
 from gui_executor.utypes import Callback, DropdownList
-from itertools import chain
 
 from tvac import wave_generation
 from tvac.tasks.tvac.piezos import (
@@ -128,7 +127,7 @@ def ramp(
         wave_generation.ramp(
             amplitude=float(amplitude),
             period=float(period),
-            piezo_list=list(chain.from_iterable(piezo_list)),
+            piezo_list=[piezo_list] if isinstance(piezo_list, str) else list(piezo_list or[]),
             setup=load_setup(),
         )
     except Exception as e:
