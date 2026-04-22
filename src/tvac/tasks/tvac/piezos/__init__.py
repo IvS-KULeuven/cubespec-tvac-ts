@@ -1,7 +1,7 @@
 from typing import List
 
 from egse.setup import load_setup
-from tvac.runtime_config import no_amplifier_enabled
+from tvac.runtime_config import is_amplifier_excluded
 
 UI_TAB_DISPLAY_NAME = "Piezo Actuators"
 
@@ -44,19 +44,30 @@ def piezos_incl_all() -> List[str]:
     return piezo_list
 
 
-def _sine_sweep_param(param: str) -> float:
+def _sine_sweep_param(param: str, setup: Setup) -> float:
     """Get a sine sweep parameter value from the Setup configuration."""
-    setup = load_setup()
+    setup = setup or load_setup()
     return float(getattr(setup.gse.wave_generators.piezo_tests.sine_sweep, param))
 
 
 def sine_sweep_amplitude() -> float:
-    return _sine_sweep_param("amplitude")
+    setup = load_setup()
+
+    if is_amplifier_excluded():
+        amplification = setup.gse.wave_generators.piezo_tests.amplification
+        return amplification * _sine_sweep_param("amplitude", setup=setup)
+    else:
+        return _sine_sweep_param("amplitude", setup)
 
 
 def sine_sweep_dc_offset() -> float:
-    dc_offset = _sine_sweep_param("dc_offset")
-    return dc_offset * 20.0 if no_amplifier_enabled() else dc_offset
+    setup = load_setup()
+
+    if is_amplifier_excluded():
+        amplification = setup.gse.wave_generators.piezo_tests.amplification
+        return amplification * _sine_sweep_param("dc_offset", setup)
+    else:
+        return _sine_sweep_param("dc_offset", setup)
 
 
 def sine_sweep_start_frequency() -> float:
@@ -72,8 +83,13 @@ def sine_sweep_time() -> float:
 
 
 def sine_sweep_fixed_voltage() -> float:
-    fixed_voltage = _sine_sweep_param("fixed_voltage")
-    return fixed_voltage * 20.0 if no_amplifier_enabled() else fixed_voltage
+    setup = load_setup()
+
+    if is_amplifier_excluded():
+        amplification = setup.gse.wave_generators.piezo_tests.amplification
+        return amplification * _sine_sweep_param("fixed_voltage", setup)
+    else:
+        return _sine_sweep_param("fixed_voltage", setup)
 
 
 def _sine_sweep_labjack_logging_param(param: str) -> float:
@@ -107,7 +123,7 @@ def _ramp_param(param: str) -> float:
 
 
 def ramp_amplitude() -> float:
-    if no_amplifier_enabled():
+    if is_amplifier_excluded():
         # We normally wanted 10 V here, but the AWG cannot output this unless the
         # output load is set to OPEN instead of 50 Ohm.
         return 5.0
