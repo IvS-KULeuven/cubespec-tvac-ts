@@ -127,7 +127,9 @@ def ramp(
         wave_generation.ramp(
             amplitude=float(amplitude),
             period=float(period),
-            piezo_list=[piezo_list] if isinstance(piezo_list, str) else list(piezo_list or[]),
+            piezo_list=[piezo_list]
+            if isinstance(piezo_list, str)
+            else list(piezo_list or []),
             setup=load_setup(),
         )
     except Exception as e:
