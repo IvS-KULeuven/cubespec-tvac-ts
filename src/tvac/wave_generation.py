@@ -543,7 +543,7 @@ def start_sine_sweep(
                     awg.set_sweep_start_frequency(start_frequency)
                     awg.set_sweep_stop_frequency(stop_frequency)
                     awg.set_sweep_time(sweep_time)
-                    awg.set_sweep(Sweep.ON)
+
                 else:
                     # Configure the constant voltage
 
@@ -558,6 +558,7 @@ def start_sine_sweep(
 
     if sweep_awg is not None and sweep_channel is not None:
         sweep_awg.set_channel(sweep_channel)
+        sweep_awg.set_sweep(Sweep.ON)
         sweep_awg.set_output(Output.ON)
 
 
