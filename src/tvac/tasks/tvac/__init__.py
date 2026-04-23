@@ -6,7 +6,7 @@ from pathlib import Path
 from executor import ExternalCommand
 import gui_executor.client as client
 
-from tvac.runtime_config import set_no_amplifier
+from tvac.runtime_config import exclude_amplifier
 
 HERE = Path(__file__).parent.resolve()
 
@@ -37,7 +37,7 @@ def _parse_tvac_ui_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]
 def tvac_ui():
     client.MyClient.wait_for_ready = _wait_for_ready  # type: ignore[assignment]
     args, gui_executor_args = _parse_tvac_ui_args(sys.argv[1:])
-    set_no_amplifier(args.no_amplifier)
+    exclude_amplifier(args.no_amplifier)
 
     logo_path = HERE / "icons/dashboard.svg"
     cmd_log = _resolve_cmd_log_dir()

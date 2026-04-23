@@ -1,13 +1,18 @@
 import os
 
-NO_AMPLIFIER_ENV_VAR = "TVAC_NO_AMPLIFIER"
-_TRUE_VALUES = {"1", "true", "yes", "on"}
+from egse.env import bool_env
+
+EXCLUDE_AMPLIFIER_ENV_VAR = "0"
 
 
-def no_amplifier_enabled() -> bool:
-    value = os.environ.get(NO_AMPLIFIER_ENV_VAR, "")
-    return value.strip().lower() in _TRUE_VALUES
+def is_amplifier_excluded() -> bool:
+    return bool_env(EXCLUDE_AMPLIFIER_ENV_VAR, False)
 
 
-def set_no_amplifier(enabled: bool) -> None:
-    os.environ[NO_AMPLIFIER_ENV_VAR] = "1" if enabled else "0"
+def exclude_amplifier(exclude: bool) -> None:
+    os.environ[EXCLUDE_AMPLIFIER_ENV_VAR] = "1" if exclude else "0"
+
+    if exclude:
+        os.environ.pop("GUI_EXECUTOR_ATTENTION_LABEL", None)
+    else:
+        os.environ["GUI_EXECUTOR_ATTENTION_LABEL"] = "AMPLIFIER IN USE"

@@ -18,7 +18,7 @@ from egse.observation import building_block
 from egse.settings import Settings
 from egse.setup import load_setup, Setup
 
-from tvac.runtime_config import no_amplifier_enabled
+from tvac.runtime_config import is_amplifier_excluded
 from tvac.strain_gauge import (
     disable_sg_logging,
     enable_sg_logging,
@@ -198,6 +198,23 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
                 awg_list.append(awg)
                 channel_list.append(channel)
 
+    # noinspection PyUnresolvedReferences
+    piezo_tests_setup = setup.gse.wave_generators.piezo_tests
+
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
+
+    if is_amplifier_excluded():
+        min_voltage, max_voltage = [
+            voltage * piezo_tests_setup.amplification
+            for voltage in piezo_tests_setup.safety_range
+        ]
+    else:
+        min_voltage, max_voltage = piezo_tests_setup.safety_range
+
     # Extract the voltage profiles for the piezo actuators
     # -> These contain the amplitude, output load, DC offset, and signal (the frequency comes separately)
 
@@ -206,18 +223,14 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     )
 
     for config in (v1_config, v2_config, v3_config):
-        if not no_amplifier_enabled():
-            # noinspection PyUnresolvedReferences
-            min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
-            if np.min(config.signal) < min_voltage or np.max(config.signal) > max_voltage:
-                raise ValueError(
-                    f"Voltage profile {profile} for piezo actuator {config.name} is outside of the safe range for piezo "
-                    f"actuators ({min_voltage} - {max_voltage}V at wave generator level)"
-                )
+        if np.min(config.signal) < min_voltage or np.max(config.signal) > max_voltage:
+            raise ValueError(
+                f"Voltage profile {profile} for piezo actuator {config.name} is outside of the safe range for piezo actuators ({min_voltage} - {max_voltage}V)"
+            )
+
         if config.amplitude == 0:
             raise ValueError(
-                f"Voltage profile {profile} for piezo actuator {config.name} has an amplitude of 0Vpp, which is not "
-                f"supported"
+                f"Voltage profile {profile} for piezo actuator {config.name} has an amplitude of 0Vpp, which is not supported"
             )
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
@@ -386,34 +399,39 @@ def sine_sweep(
 
     setup = setup or load_setup()
     # noinspection PyUnresolvedReferences
-    sine_sweep_labjack_logging = (
-        setup.gse.wave_generators.piezo_tests.sine_sweep.labjack_logging
-    )
+    piezo_tests_setup = setup.gse.wave_generators.piezo_tests
+    sine_sweep_labjack_logging = piezo_tests_setup.sine_sweep.labjack_logging
 
     if amplitude == 0:
         raise ValueError(
-            f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not "
-            f"supported"
+            f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not supported"
         )
 
-    if not no_amplifier_enabled():
-        # noinspection PyUnresolvedReferences
-        min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
 
-        if not min_voltage <= fixed_voltage <= max_voltage:
-            raise ValueError(
-                f"Fixed voltage is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V at "
-                f"wave generator level)"
-            )
+    if is_amplifier_excluded():
+        min_voltage, max_voltage = [
+            voltage * piezo_tests_setup.amplification
+            for voltage in piezo_tests_setup.safety_range
+        ]
+    else:
+        min_voltage, max_voltage = piezo_tests_setup.safety_range
 
-        if (
-            dc_offset - amplitude / 2 < min_voltage
-            or dc_offset + amplitude / 2 > max_voltage
-        ):
-            raise ValueError(
-                f"The combination of amplitude and DC offset leads to voltages outside of the safety range for the piezo "
-                f"actuators ({min_voltage} - {max_voltage}V at wave generator level)"
-            )
+    if not min_voltage <= fixed_voltage <= max_voltage:
+        raise ValueError(
+            f"Fixed voltage is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V)"
+        )
+    if (
+        dc_offset - amplitude / 2 < min_voltage
+        or dc_offset + amplitude / 2 > max_voltage
+    ):
+        raise ValueError(
+            f"The combination of amplitude and DC offset leads to voltages outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V)"
+        )
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup)
     # All channels should be disabled -> This may not be the default behaviour from the setup, so do this explicitly
@@ -563,16 +581,27 @@ def ramp(
     """
 
     setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
+    piezo_tests_setup = setup.gse.wave_generators.piezo_tests
 
-    if not no_amplifier_enabled():
-        # noinspection PyUnresolvedReferences
-        min_voltage, max_voltage = setup.gse.wave_generators.piezo_tests.safety_range
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
 
-        if not min_voltage <= amplitude <= max_voltage:
-            raise ValueError(
-                f"Given amplitude is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V "
-                f"at wave generator level)"
-            )
+    if is_amplifier_excluded():
+        min_voltage, max_voltage = [
+            voltage * piezo_tests_setup.amplification
+            for voltage in piezo_tests_setup.safety_range
+        ]
+    else:
+        min_voltage, max_voltage = piezo_tests_setup.safety_range
+
+    if not min_voltage <= amplitude <= max_voltage:
+        raise ValueError(
+            f"Given amplitude is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V)"
+        )
 
     if amplitude == 0:
         raise ValueError(
