@@ -44,8 +44,17 @@ def piezos_incl_all() -> List[str]:
     return piezo_list
 
 
-def _sine_sweep_param(param: str, setup: Setup) -> float:
-    """Get a sine sweep parameter value from the Setup configuration."""
+def _sine_sweep_param(param: str, setup: Setup | None = None) -> float:
+    """Get a sine sweep parameter value from the Setup configuration.
+
+    Args:
+        param (str): Parameter name.
+        setup (Setup | None): Setup.
+
+    Returns:
+        Parameter value.
+    """
+
     setup = setup or load_setup()
     return float(getattr(setup.gse.wave_generators.piezo_tests.sine_sweep, param))
 
@@ -57,7 +66,7 @@ def sine_sweep_amplitude() -> float:
         amplification = setup.gse.wave_generators.piezo_tests.amplification
         return amplification * _sine_sweep_param("amplitude", setup=setup)
     else:
-        return _sine_sweep_param("amplitude", setup)
+        return _sine_sweep_param("amplitude", setup=setup)
 
 
 def sine_sweep_dc_offset() -> float:
@@ -67,7 +76,7 @@ def sine_sweep_dc_offset() -> float:
         amplification = setup.gse.wave_generators.piezo_tests.amplification
         return amplification * _sine_sweep_param("dc_offset", setup)
     else:
-        return _sine_sweep_param("dc_offset", setup)
+        return _sine_sweep_param("dc_offset", setup=setup)
 
 
 def sine_sweep_start_frequency() -> float:
@@ -87,9 +96,9 @@ def sine_sweep_fixed_voltage() -> float:
 
     if is_amplifier_excluded():
         amplification = setup.gse.wave_generators.piezo_tests.amplification
-        return amplification * _sine_sweep_param("fixed_voltage", setup)
+        return amplification * _sine_sweep_param("fixed_voltage", setup=setup)
     else:
-        return _sine_sweep_param("fixed_voltage", setup)
+        return _sine_sweep_param("fixed_voltage", setup=setup)
 
 
 def _sine_sweep_labjack_logging_param(param: str) -> float:
@@ -117,7 +126,15 @@ def sine_sweep_sg_scan_rate() -> float:
 
 
 def _ramp_param(param: str) -> float:
-    """Get a ramp parameter value from the Setup configuration."""
+    """Get a ramp parameter value from the Setup configuration.
+
+    Args:
+        param (str): Parameter name.
+
+    Returns:
+        Parameter value.
+    """
+
     setup = load_setup()
     return float(getattr(setup.gse.wave_generators.piezo_tests.ramp, param))
 
