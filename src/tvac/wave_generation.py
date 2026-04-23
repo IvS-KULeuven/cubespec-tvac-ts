@@ -401,8 +401,7 @@ def sine_sweep(
 
     if amplitude == 0:
         raise ValueError(
-            f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not "
-            f"supported"
+            f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not supported"
         )
 
     # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
@@ -418,15 +417,14 @@ def sine_sweep(
 
     if not min_voltage <= fixed_voltage <= max_voltage:
         raise ValueError(
-            f"Fixed voltage is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V"
+            f"Fixed voltage is outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V)"
         )
-
     if (
         dc_offset - amplitude / 2 < min_voltage
         or dc_offset + amplitude / 2 > max_voltage
     ):
         raise ValueError(
-            f"The combination of amplitude and DC offset leads to voltages outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V "
+            f"The combination of amplitude and DC offset leads to voltages outside of the safety range for the piezo actuators ({min_voltage} - {max_voltage}V)"
         )
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup)
