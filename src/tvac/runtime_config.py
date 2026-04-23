@@ -14,3 +14,5 @@ def exclude_amplifier(exclude: bool) -> None:
 
     if exclude:
         os.environ["GUI_EXECUTOR_ATTENTION_LABEL"] = "NO AMPLIFIER"
+    else:
+        os.environ.pop("GUI_EXECUTOR_ATTENTION_LABEL", None)
