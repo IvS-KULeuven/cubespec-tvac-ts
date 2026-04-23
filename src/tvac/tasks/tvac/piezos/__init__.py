@@ -1,6 +1,6 @@
 from typing import List
 
-from egse.setup import load_setup
+from egse.setup import load_setup, Setup
 from tvac.runtime_config import is_amplifier_excluded
 
 UI_TAB_DISPLAY_NAME = "Piezo Actuators"
