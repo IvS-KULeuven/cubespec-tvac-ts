@@ -1,10 +1,12 @@
+import argparse
 import os
+import shlex
 import sys
 from pathlib import Path
 from executor import ExternalCommand
 import gui_executor.client as client
 
-from gui_executor.__main__ import main as gui_executor_main
+from tvac.runtime_config import set_no_amplifier
 
 HERE = Path(__file__).parent.resolve()
 
@@ -22,11 +24,25 @@ def _resolve_cmd_log_dir() -> str:
     return cmd_log
 
 
+def _parse_tvac_ui_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        "--no-amplifier",
+        action="store_true",
+        help="Run the piezo UI without the external amplifier in the signal chain.",
+    )
+    return parser.parse_known_args(argv)
+
+
 def tvac_ui():
     client.MyClient.wait_for_ready = _wait_for_ready  # type: ignore[assignment]
+    args, gui_executor_args = _parse_tvac_ui_args(sys.argv[1:])
+    set_no_amplifier(args.no_amplifier)
 
     logo_path = HERE / "icons/dashboard.svg"
     cmd_log = _resolve_cmd_log_dir()
+    passthrough_args = shlex.join(gui_executor_args)
+    passthrough = f" {passthrough_args}" if passthrough_args else ""
 
     cmd = ExternalCommand(
         f"gui-executor --verbose --module-path tvac.tasks.tvac.heaters "
@@ -35,7 +51,7 @@ def tvac_ui():
         f"--module-path tvac.tasks.tvac.observations "
         f"--kernel-name cubespec-tvac-ts --single "
         f"--logo {logo_path} --cmd-log {cmd_log} --app-name 'TVAC GUI' "
-        f"{' '.join(sys.argv[1:])}",
+        f"{passthrough}",
         asynchronous=True,
     )
     cmd.start()
