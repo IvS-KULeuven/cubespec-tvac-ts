@@ -201,8 +201,11 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     # noinspection PyUnresolvedReferences
     piezo_tests_setup = setup.gse.wave_generators.piezo_tests
 
-    # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
-    # assuming that the signal will pass through the amplifier).
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
 
     if is_amplifier_excluded():
         min_voltage, max_voltage = [
@@ -404,8 +407,11 @@ def sine_sweep(
             f"The amplitude for the sine sweep for piezo actuator {piezo} has an amplitude of 0Vpp, which is not supported"
         )
 
-    # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
-    # assuming that the signal will pass through the amplifier).
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
 
     if is_amplifier_excluded():
         min_voltage, max_voltage = [
@@ -578,8 +584,11 @@ def ramp(
     # noinspection PyUnresolvedReferences
     piezo_tests_setup = setup.gse.wave_generators.piezo_tests
 
-    # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
-    # assuming that the signal will pass through the amplifier).
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
 
     if is_amplifier_excluded():
         min_voltage, max_voltage = [
