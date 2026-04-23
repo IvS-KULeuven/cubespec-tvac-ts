@@ -198,6 +198,20 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
                 awg_list.append(awg)
                 channel_list.append(channel)
 
+    # noinspection PyUnresolvedReferences
+    piezo_tests_setup = setup.gse.wave_generators.piezo_tests
+
+    # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
+    # assuming that the signal will pass through the amplifier).
+
+    if is_amplifier_excluded():
+        min_voltage, max_voltage = [
+            voltage * piezo_tests_setup.amplification
+            for voltage in piezo_tests_setup.safety_range
+        ]
+    else:
+        min_voltage, max_voltage = piezo_tests_setup.safety_range
+
     # Extract the voltage profiles for the piezo actuators
     # -> These contain the amplitude, output load, DC offset, and signal (the frequency comes separately)
 
@@ -206,20 +220,6 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     )
 
     for config in (v1_config, v2_config, v3_config):
-        # noinspection PyUnresolvedReferences
-        piezo_tests_setup = setup.gse.wave_generators.piezo_tests
-
-        # The limits in the setup are defined before amplification (i.e. voltage limits at wave generator level,
-        # assuming that the signal will pass through the amplifier).
-
-        if is_amplifier_excluded():
-            min_voltage, max_voltage = [
-                voltage * piezo_tests_setup.amplification
-                for voltage in piezo_tests_setup.safety_range
-            ]
-        else:
-            min_voltage, max_voltage = piezo_tests_setup.safety_range
-
         if np.min(config.signal) < min_voltage or np.max(config.signal) > max_voltage:
             raise ValueError(
                 f"Voltage profile {profile} for piezo actuator {config.name} is outside of the safe range for piezo actuators ({min_voltage} - {max_voltage}V)"
