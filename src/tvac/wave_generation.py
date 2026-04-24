@@ -464,8 +464,10 @@ def sine_sweep(
     )
 
     # Let the sine sweep go on for the requested duration
+    # Since the sine sweep starts at random time in the sweep, we let it go on for twice the requested duration, to
+    # ensure that we get at least one full sine sweep.
 
-    time.sleep(float(sweep_time))
+    time.sleep(2 * float(sweep_time))
 
     # Stop the wave generation + reset the wave generators
 
