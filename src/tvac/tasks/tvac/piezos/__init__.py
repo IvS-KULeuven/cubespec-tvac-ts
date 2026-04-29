@@ -45,7 +45,7 @@ def piezos_incl_all() -> List[str]:
 
 
 def _sine_sweep_param(param: str, setup: Setup | None = None) -> float:
-    """Get a sine sweep parameter value from the Setup configuration.
+    """Get a sine sweep parameter value from the setup.
 
     Args:
         param (str): Parameter name.
@@ -102,7 +102,7 @@ def sine_sweep_fixed_voltage() -> float:
 
 
 def _sine_sweep_labjack_logging_param(param: str) -> float:
-    """Get a sine sweep parameter LabJack logging value from the Setup configuration."""
+    """Get a sine sweep parameter LabJack logging value from the setup."""
     setup = load_setup()
     return float(
         getattr(setup.gse.wave_generators.piezo_tests.sine_sweep.labjack_logging, param)
@@ -126,7 +126,7 @@ def sine_sweep_sg_scan_rate() -> float:
 
 
 def _ramp_param(param: str) -> float:
-    """Get a ramp parameter value from the Setup configuration.
+    """Get a ramp parameter value from the setup.
 
     Args:
         param (str): Parameter name.
@@ -149,3 +149,36 @@ def ramp_amplitude() -> float:
 
 def ramp_period() -> float:
     return _ramp_param("period")
+
+
+def _plateau_param(param: str, setup: Setup | None = None) -> float:
+    """Get a plateau parameter value from the setup.
+
+    Args:
+        param (str): Parameter name.
+        setup (Setup | None): Setup.
+
+    Returns:
+        Parameter value.
+    """
+
+    setup = setup or load_setup()
+    return float(getattr(setup.gse.wave_generators.piezo_tests.plateau, param))
+
+
+def plateau_voltage() -> float:
+    setup = load_setup()
+
+    if is_amplifier_excluded():
+        amplification = setup.gse.wave_generators.piezo_tests.amplification
+        return amplification * _plateau_param("voltage", setup=setup)
+    else:
+        return _plateau_param("voltage", setup=setup)
+
+
+def plateau_duration() -> float:
+    return _plateau_param("duration")
+
+
+def plateau_edge_duration() -> float:
+    return _plateau_param("edges")
