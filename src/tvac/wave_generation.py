@@ -203,7 +203,7 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
@@ -409,7 +409,7 @@ def sine_sweep(
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
@@ -572,9 +572,13 @@ def ramp(
 
     Within the context of an observation, we perform the following steps:
 
+        - Interrupt all logging from the LabJack, to ensure a clean logging.
+        - Configure + start logging of the strain gauges (all configuration parameters are taken from the setup, apart
+          from the destination folder and filename pattern).
         - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
           still have to reset the settings of the wave generators.
         - Stop the wave generation and reset.
+        - Stop the logging of the strain gauges (disable + reset its parameters).
 
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
@@ -589,7 +593,7 @@ def ramp(
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
