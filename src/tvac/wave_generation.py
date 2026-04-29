@@ -203,7 +203,7 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
@@ -409,7 +409,7 @@ def sine_sweep(
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
@@ -572,9 +572,13 @@ def ramp(
 
     Within the context of an observation, we perform the following steps:
 
+        - Interrupt all logging from the LabJack, to ensure a clean logging.
+        - Configure + start logging of the strain gauges (all configuration parameters are taken from the setup, apart
+          from the destination folder and filename pattern).
         - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
           still have to reset the settings of the wave generators.
         - Stop the wave generation and reset.
+        - Stop the logging of the strain gauges (disable + reset its parameters).
 
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
@@ -589,7 +593,7 @@ def ramp(
 
     # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
     # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
-    # at the level of the piezo actuators).  When the amplifier is excluded, the configured voltages will be fed
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
     # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
     # in the wave generators.
 
@@ -692,6 +696,117 @@ def start_ramp(
             time.sleep(0.5)
 
         awg.set_output(Output.OFF)
+
+
+@building_block
+def plateau(
+    voltage: float = 0.4,
+    duration: float = 60,
+    edges: float = 1,
+    setup: Setup = None,
+) -> None:
+    """Performs a voltage plateau for the three piezo actuators at the same time.
+
+    Within the context of an observation, we perform the following steps:
+
+        - Interrupt all logging from the LabJack, to ensure a clean logging.
+        - Configure + start logging of the strain gauges (all configuration parameters are taken from the setup, apart
+          from the destination folder and filename pattern).
+        - Configure the three channels of the wave generators to ramp up the voltage to a plateau and then ramp down
+          again.
+        - Make use of an external trigger signal (coming from a GPIO pin of a Raspberry Pi being set high) to start the
+          ramp up to the plateau.  The ramp down starts automatically after the requested duration of the plateau.
+        - Stop the wave generation and reset.
+        - Stop the logging of the strain gauges (disable + reset its parameters).
+
+    Args:
+        voltage (float): Plateau voltage [V].
+        duration (float): Plateau duration [s].
+        edges (float): Duration of the linear rise and of the linear fall [s].
+        setup (Setup): Setup.
+    """
+
+    setup = setup or load_setup()
+    # noinspection PyUnresolvedReferences
+    wave_generators_setup = setup.gse.wave_generators
+    output_load = wave_generators_setup.piezo_tests.output_load
+
+    awg_list = []
+    channel_list = []
+
+    for _, awg_info in wave_generators_setup.items():
+        if "piezo_channels" in awg_info:  # Exclude the non-device blocks
+            awg: Tgf4000Interface = awg_info.device
+            awg.reconnect()  # Mitigate possible connection issues (#54)
+
+            for piezo_name, channel in awg_info.piezo_channels.items():
+                awg_list.append(awg)
+                channel_list.append(channel)
+
+    # noinspection PyUnresolvedReferences
+    piezo_tests_setup = setup.gse.wave_generators.piezo_tests
+    # soft_start_setup = piezo_tests_setup.soft_start
+
+    # The limits in the setup are defined at the level of the wave generators, assuming that the generated voltages
+    # will pass through the amplifier and get amplified by a factor `amplification`.  This is to avoid unsafe voltages
+    # at the level of the piezo actuators.  When the amplifier is excluded, the configured voltages will be fed
+    # directly to the piezo actuators, so you can a factor `amplification` higher in the configuration of the voltages
+    # in the wave generators.
+
+    if is_amplifier_excluded():
+        min_voltage, max_voltage = [
+            voltage * piezo_tests_setup.amplification
+            for voltage in piezo_tests_setup.safety_range
+        ]
+    else:
+        min_voltage, max_voltage = piezo_tests_setup.safety_range
+
+    if voltage < min_voltage or voltage > max_voltage:
+        raise ValueError(
+            f"Plateau for piezo actuators is outside of the safe range for piezo actuators ({min_voltage} - {max_voltage}V)"
+        )
+
+    if voltage == 0:
+        raise ValueError(f"Plateau for piezo actuators is 0V, which is not supported")
+
+    # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
+    # default configuration (except for the output folder and filenames: these should pertain to the obsid)
+
+    disable_sg_logging(setup=setup)
+    enable_all_sg_logging(setup=setup)
+
+    for awg, channel in zip(awg_list, channel_list):
+        awg.set_channel(channel)
+
+        awg.set_waveform_shape(WaveformShape.PULSE)
+        awg.set_amplitude(voltage)
+        awg.set_dc_offset(voltage / 2.0)
+        awg.set_pulse_width(
+            duration + edges
+        )  # Duration of the pulse (including half the edges) [s]
+        awg.set_pulse_edges(edges)  # Duration of the individual edges [s]
+        awg.set_output_load(output_load)
+
+        # Set the output on, but wait for the external trigger signal to start generating waveforms
+
+        awg.set_burst_trigger_source(TriggerSource.EXTERNAL)
+        awg.set_burst(Burst.GATED)
+        awg.set_output(Output.ON)
+
+    # External trigger, coming from the Raspberry Pi -> Start waveform generation (plateau)
+
+    start_signal_trigger()
+    time.sleep(duration + 2 * edges)
+    stop_signal_trigger()
+
+    # Stop the wave generation + reset the wave generators
+
+    stop_wave_generation_and_reset(setup=setup)
+
+    # Disable the logging of the strain gauges
+    # We don't explicitly disable the channels but settle for the default behaviour from the setup
+
+    disable_sg_logging(setup=setup)
 
 
 @building_block
