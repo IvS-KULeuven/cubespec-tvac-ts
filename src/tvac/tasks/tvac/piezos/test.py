@@ -9,6 +9,9 @@ from tvac.tasks.tvac.piezos import (
     sine_sweep_sg_scan_rate,
     ramp_amplitude,
     ramp_period,
+    plateau_voltage,
+    plateau_duration,
+    plateau_edge_duration,
 )
 from tvac.tasks.tvac.piezos import (
     sine_sweep_amplitude,
@@ -54,7 +57,7 @@ def sine_sweep(
 
         - Interrupt all logging from the LabJack, to ensure a clean logging of the requested strain gauge.
         - Configure + start logging of the requested strain gauge at the requested scan rate (all other configuration
-          parameters are taken from the setup).
+          parameters are taken from the setup, apart from the destination folder and filename pattern).
         - For the given piezo actuator, we configure (and switch on) a frequency sweep.  For the other piezo actuators,
           we configure a constant voltage.
         - Sleep for the requested duration of the sine sweep (we should only cover a single sine sweep).
@@ -109,9 +112,13 @@ def ramp(
 
     Within the context of an observation, we perform the following steps:
 
+        - Interrupt all logging from the LabJack, to ensure a clean logging.
+        - Configure + start logging of the strain gauges (all configuration parameters are taken from the setup, apart
+          from the destination folder and filename pattern).
         - Ramp the voltage up and down for one piezo after the other.  After that, the wave generation stops, but we
           still have to reset the settings of the wave generators.
         - Stop the wave generation and reset.
+        - Stop the logging of the strain gauges (disable + reset its parameters).
 
     Args:
         amplitude (float): Amplitude of the ramp [Vpp].
@@ -136,5 +143,48 @@ def ramp(
         print(
             f"Failed to ramp voltages up and down for piezo actuators {piezo_list}: {e}"
         )
+
+    end_observation()
+
+
+# noinspection PyTypeHints
+@exec_ui(display_name="Plateau", use_kernel=True)
+def plateau(
+    voltage: Callback(plateau_voltage, name="Plateau voltage [V]") = None,
+    duration: Callback(plateau_duration, name="Plateau duration [s]") = None,
+    edges: Callback(plateau_edge_duration, name="Edge duration [s]") = None,
+) -> None:
+    """Performs a voltage plateau for the three piezo actuators at the same time.
+
+    Within the context of an observation, we perform the following steps:
+
+        - Interrupt all logging from the LabJack, to ensure a clean logging.
+        - Configure + start logging of the strain gauges (all configuration parameters are taken from the setup, apart
+          from the destination folder and filename pattern).
+        - Configure the three channels of the wave generators to ramp up the voltage to a plateau and then ramp down
+          again.
+        - Make use of an external trigger signal (coming from a GPIO pin of a Raspberry Pi being set high) to start the
+          ramp up to the plateau.  The ramp down starts automatically after the requested duration of the plateau.
+        - Stop the wave generation and reset.
+        - Stop the logging of the strain gauges (disable + reset its parameters).
+
+
+    Args:
+        voltage: Plateau voltage [V].
+        duration: Plateau duration [s].
+        edges: Duration of the linear rise and of the linear fall [s].
+    """
+
+    start_observation(f"Simultaneous voltage plateau for all piezo actuators")
+
+    try:
+        wave_generation.plateau(
+            voltage=voltage,
+            duration=duration,
+            edges=edges,
+            setup=load_setup(),
+        )
+    except Exception as e:
+        print(f"Failed to perform voltage plateau for all piezo actuators: {e}")
 
     end_observation()
