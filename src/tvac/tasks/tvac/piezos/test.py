@@ -168,7 +168,6 @@ def plateau(
         - Stop the wave generation and reset.
         - Stop the logging of the strain gauges (disable + reset its parameters).
 
-
     Args:
         voltage: Plateau voltage [V].
         duration: Plateau duration [s].
