@@ -3,6 +3,8 @@ import os
 import shlex
 import sys
 from pathlib import Path
+
+from egse.setup import load_setup
 from executor import ExternalCommand
 import gui_executor.client as client
 
@@ -44,14 +46,30 @@ def tvac_ui():
     passthrough_args = shlex.join(gui_executor_args)
     passthrough = f" {passthrough_args}" if passthrough_args else ""
 
+    setup = load_setup()
+
+    cmd_str = "gui-executor --verbose "
+
+    # Incl. tabs depending on what is present in the setup (see #99)
+
+    if "power_supply" in setup.gse:
+        cmd_str += " --module-path tvac.tasks.tvac.heaters"
+    if "wave_generators" in setup.gse:
+        cmd_str += " --module-path tvac.tasks.tvac.piezos"
+    if "labjack_t7" in setup.gse:
+        cmd_str += " --module-path tvac.tasks.tvac.strain_gauges"
+
+    cmd_str += (
+        f" --module-path tvac.tasks.tvac.observations"
+        f" --kernel-name cubespec-tvac-ts --single"
+        f" --logo {logo_path}"
+        f" --cmd-log {cmd_log}"
+        f" --app-name 'TVAC GUI' "
+        f" {passthrough}"
+    )
+
     cmd = ExternalCommand(
-        f"gui-executor --verbose --module-path tvac.tasks.tvac.heaters "
-        f"--module-path tvac.tasks.tvac.piezos "
-        f"--module-path tvac.tasks.tvac.strain_gauges "
-        f"--module-path tvac.tasks.tvac.observations "
-        f"--kernel-name cubespec-tvac-ts --single "
-        f"--logo {logo_path} --cmd-log {cmd_log} --app-name 'TVAC GUI' "
-        f"{passthrough}",
+        cmd_str,
         asynchronous=True,
     )
     cmd.start()
