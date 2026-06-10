@@ -448,6 +448,9 @@ def sine_sweep(
         resolution_index=sine_sweep_labjack_logging.resolution_index,
         scan_rate=scan_rate,
         setup=setup,
+        stream_resolution_index=getattr(
+            sine_sweep_labjack_logging, "stream_resolution_index", 0
+        ),
     )
 
     # Configure and initiate the sine sweep (keeps on going until the wave generation is stopped explicitly)

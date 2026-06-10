@@ -181,6 +181,7 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, Any]]:
     return {
         "stream": {
             "scan_rate": cfg.stream.scan_rate,
+            "stream_resolution_index": getattr(cfg.stream, "stream_resolution_index", 0),
             "resync_interval_s": cfg.stream.resync_interval_s,
             "buffer_size": cfg.stream.buffer_size,
         },
@@ -280,6 +281,7 @@ def get_cached_sg_channel_settings() -> dict[str, dict[str, Any]]:
 def set_sg_runtime_settings(
     *,
     scan_rate=None,
+    stream_resolution_index=None,
     resync_interval_s=None,
     buffer_size=None,
     csv_enabled=None,
@@ -300,6 +302,12 @@ def set_sg_runtime_settings(
     if scan_rate is not None:
         _runtime_overrides["stream"]["scan_rate"] = _coerce_positive_float(
             scan_rate, "scan_rate"
+        )
+    if stream_resolution_index is not None:
+        _runtime_overrides["stream"]["stream_resolution_index"] = (
+            _coerce_non_negative_int(
+                stream_resolution_index, "stream_resolution_index"
+            )
         )
     if resync_interval_s is not None:
         _runtime_overrides["stream"]["resync_interval_s"] = _coerce_positive_int(
@@ -423,6 +431,7 @@ def get_sg_settings(setup: Setup = None) -> str:
         (
             "stream: "
             f"scan_rate={effective['stream']['scan_rate']}, "
+            f"stream_resolution_index={effective['stream']['stream_resolution_index']}, "
             f"resync_interval_s={effective['stream']['resync_interval_s']}, "
             f"buffer_size={effective['stream']['buffer_size']}"
         ),
@@ -686,6 +695,7 @@ def start_sg_logging(setup: Setup = None):
             voltage_range=voltage_ranges,
             neg_voltage_range=neg_voltage_ranges,
             resolution_index=resolution_indices,
+            stream_resolution_index=int(effective["stream"]["stream_resolution_index"]),
             resync_interval_s=int(effective["stream"]["resync_interval_s"]),
             buffer_size=int(effective["stream"]["buffer_size"]),
         )
@@ -702,6 +712,7 @@ def start_sg_logging(setup: Setup = None):
         "starting stream "
         f"channels={_active_channel_labels} "
         f"scan_rate={effective['stream']['scan_rate']} "
+        f"stream_resolution_index={effective['stream']['stream_resolution_index']} "
         f"plot_enabled={effective['plot']['enabled']} "
         f"csv_enabled={effective['csv']['enabled']}"
         f"metrics_enabled={effective['metrics']['enabled']}",
@@ -853,6 +864,7 @@ def enable_all_sg_logging(setup: Setup = None) -> None:
 
     set_sg_runtime_settings(
         scan_rate=stream_setup.scan_rate,
+        stream_resolution_index=getattr(stream_setup, "stream_resolution_index", 0),
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=True,
@@ -871,7 +883,8 @@ def enable_sg_logging(
     neg_voltage_range,
     resolution_index: int,
     scan_rate: float,
-    setup: Setup,
+    setup: Setup = None,
+    stream_resolution_index: int | None = None,
 ) -> None:
     """Enables the logging for the given strain gauge.
 
@@ -893,6 +906,7 @@ def enable_sg_logging(
         resolution_index (int): Resolution index of the strain gauge [m].
         scan_rate (float): Scan rate of the strain gauge [Hz].
         setup (Setup): Setup.
+        stream_resolution_index (int | None): Stream-wide resolution index [m].
     """
 
     setup = setup or load_setup()
@@ -924,6 +938,11 @@ def enable_sg_logging(
 
     set_sg_runtime_settings(
         scan_rate=scan_rate,
+        stream_resolution_index=(
+            stream_resolution_index
+            if stream_resolution_index is not None
+            else getattr(stream_setup, "stream_resolution_index", 0)
+        ),
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=True,
@@ -998,6 +1017,7 @@ def reset_sg(setup: Setup = None) -> None:
 
     set_sg_runtime_settings(
         scan_rate=stream_setup.scan_rate,
+        stream_resolution_index=getattr(stream_setup, "stream_resolution_index", 0),
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=csv_setup.enabled,
