@@ -358,6 +358,12 @@ def extract_awg_config_from_setup(profile: str, setup: Setup = None):
     return v1_config, v2_config, v3_config, frequency
 
 
+def _piezo_test_stream_resolution_index(test_setup) -> int:
+    """Return the LabJack stream resolution index for one piezo test."""
+    labjack_logging = getattr(test_setup, "labjack_logging", None)
+    return int(getattr(labjack_logging, "stream_resolution_index", 0))
+
+
 @building_block
 def sine_sweep(
     piezo: str,
@@ -448,8 +454,8 @@ def sine_sweep(
         resolution_index=sine_sweep_labjack_logging.resolution_index,
         scan_rate=scan_rate,
         setup=setup,
-        stream_resolution_index=getattr(
-            sine_sweep_labjack_logging, "stream_resolution_index", 0
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.sine_sweep
         ),
     )
 
@@ -622,7 +628,12 @@ def ramp(
     # default configuration (except for the output folder and filenames: these should pertain to the obsid)
 
     disable_sg_logging(setup=setup)
-    enable_all_sg_logging(setup=setup)
+    enable_all_sg_logging(
+        setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.ramp
+        ),
+    )
 
     # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
     # reset the wave generators)
@@ -770,13 +781,18 @@ def plateau(
         )
 
     if voltage == 0:
-        raise ValueError(f"Plateau for piezo actuators is 0V, which is not supported")
+        raise ValueError("Plateau for piezo actuators is 0V, which is not supported")
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
     # default configuration (except for the output folder and filenames: these should pertain to the obsid)
 
     disable_sg_logging(setup=setup)
-    enable_all_sg_logging(setup=setup)
+    enable_all_sg_logging(
+        setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.plateau
+        ),
+    )
 
     for awg, channel in zip(awg_list, channel_list):
         awg.set_channel(channel)

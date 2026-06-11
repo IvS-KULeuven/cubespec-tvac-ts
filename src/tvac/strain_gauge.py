@@ -820,13 +820,17 @@ def trim_plot_buffers(keep_seconds: float):
 
 
 @building_block
-def enable_all_sg_logging(setup: Setup = None) -> None:
+def enable_all_sg_logging(
+    setup: Setup = None,
+    stream_resolution_index: int | None = None,
+) -> None:
     """Enables the logging for the all strain gauge.
 
     The following steps are performed:
 
         - For all strain gauges, set the voltage ranges and resolution index (from the setup), and enable its
           channel,
+        - Set the stream resolution index override when provided,
         - Enable HK and metrics,
         - Make sure that the HK ends up in the folder, dedicated to the current observation, and that the filenames
           also refer to the current observation (since this function is a building block, it can only be run in the
@@ -864,7 +868,11 @@ def enable_all_sg_logging(setup: Setup = None) -> None:
 
     set_sg_runtime_settings(
         scan_rate=stream_setup.scan_rate,
-        stream_resolution_index=getattr(stream_setup, "stream_resolution_index", 0),
+        stream_resolution_index=(
+            stream_resolution_index
+            if stream_resolution_index is not None
+            else getattr(stream_setup, "stream_resolution_index", 0)
+        ),
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=True,
