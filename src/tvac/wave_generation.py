@@ -237,7 +237,12 @@ def load_voltage_profile(profile: str, setup: Setup = None) -> None:
     # default configuration (except for the output folder and filenames: these should pertain to the obsid)
 
     disable_sg_logging(setup=setup)
-    enable_all_sg_logging(setup=setup)
+    enable_all_sg_logging(
+        setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.profiles
+        ),
+    )
 
     # We will configure all channels with the requested voltage profile (arbitrary waveform).  Have a look at #52 on
     # more information how this works.
@@ -358,6 +363,18 @@ def extract_awg_config_from_setup(profile: str, setup: Setup = None):
     return v1_config, v2_config, v3_config, frequency
 
 
+def _piezo_test_stream_resolution_index(test_setup) -> int:
+    """Return the LabJack stream resolution index for one piezo test."""
+    if isinstance(test_setup, dict):
+        labjack_logging = test_setup.get("labjack_logging")
+    else:
+        labjack_logging = getattr(test_setup, "labjack_logging", None)
+
+    if isinstance(labjack_logging, dict):
+        return int(labjack_logging.get("stream_resolution_index", 0))
+    return int(getattr(labjack_logging, "stream_resolution_index", 0))
+
+
 @building_block
 def sine_sweep(
     piezo: str,
@@ -448,6 +465,9 @@ def sine_sweep(
         resolution_index=sine_sweep_labjack_logging.resolution_index,
         scan_rate=scan_rate,
         setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.sine_sweep
+        ),
     )
 
     # Configure and initiate the sine sweep (keeps on going until the wave generation is stopped explicitly)
@@ -619,7 +639,12 @@ def ramp(
     # default configuration (except for the output folder and filenames: these should pertain to the obsid)
 
     disable_sg_logging(setup=setup)
-    enable_all_sg_logging(setup=setup)
+    enable_all_sg_logging(
+        setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.ramp
+        ),
+    )
 
     # Configure and initiate the voltage ramp (the wave generation stops automatically, but you will still have to
     # reset the wave generators)
@@ -767,13 +792,18 @@ def plateau(
         )
 
     if voltage == 0:
-        raise ValueError(f"Plateau for piezo actuators is 0V, which is not supported")
+        raise ValueError("Plateau for piezo actuators is 0V, which is not supported")
 
     # Interrupt ongoing logging (this incl. resetting to defaults from the setup) and re-start logging with the
     # default configuration (except for the output folder and filenames: these should pertain to the obsid)
 
     disable_sg_logging(setup=setup)
-    enable_all_sg_logging(setup=setup)
+    enable_all_sg_logging(
+        setup=setup,
+        stream_resolution_index=_piezo_test_stream_resolution_index(
+            piezo_tests_setup.plateau
+        ),
+    )
 
     for awg, channel in zip(awg_list, channel_list):
         awg.set_channel(channel)

@@ -7,7 +7,6 @@ from gui_executor.utypes import Callback, TypeObject, UQWidget
 
 from tvac.strain_gauge import (
     get_cached_sg_channel_settings,
-    get_sg_channel_names,
     get_sg_effective_settings,
     get_sg_settings,
     get_sg_status,

@@ -181,6 +181,9 @@ def _snapshot_setup_cfg(setup: Setup) -> dict[str, dict[str, Any]]:
     return {
         "stream": {
             "scan_rate": cfg.stream.scan_rate,
+            # Not a setup.gse.labjack_t7.stream field. Piezo tests can override
+            # this per measurement through in-memory runtime settings.
+            "stream_resolution_index": 0,
             "resync_interval_s": cfg.stream.resync_interval_s,
             "buffer_size": cfg.stream.buffer_size,
         },
@@ -280,6 +283,7 @@ def get_cached_sg_channel_settings() -> dict[str, dict[str, Any]]:
 def set_sg_runtime_settings(
     *,
     scan_rate=None,
+    stream_resolution_index=None,
     resync_interval_s=None,
     buffer_size=None,
     csv_enabled=None,
@@ -300,6 +304,12 @@ def set_sg_runtime_settings(
     if scan_rate is not None:
         _runtime_overrides["stream"]["scan_rate"] = _coerce_positive_float(
             scan_rate, "scan_rate"
+        )
+    if stream_resolution_index is not None:
+        _runtime_overrides["stream"]["stream_resolution_index"] = (
+            _coerce_non_negative_int(
+                stream_resolution_index, "stream_resolution_index"
+            )
         )
     if resync_interval_s is not None:
         _runtime_overrides["stream"]["resync_interval_s"] = _coerce_positive_int(
@@ -686,6 +696,7 @@ def start_sg_logging(setup: Setup = None):
             voltage_range=voltage_ranges,
             neg_voltage_range=neg_voltage_ranges,
             resolution_index=resolution_indices,
+            stream_resolution_index=int(effective["stream"]["stream_resolution_index"]),
             resync_interval_s=int(effective["stream"]["resync_interval_s"]),
             buffer_size=int(effective["stream"]["buffer_size"]),
         )
@@ -809,13 +820,17 @@ def trim_plot_buffers(keep_seconds: float):
 
 
 @building_block
-def enable_all_sg_logging(setup: Setup = None) -> None:
+def enable_all_sg_logging(
+    setup: Setup = None,
+    stream_resolution_index: int | None = None,
+) -> None:
     """Enables the logging for the all strain gauge.
 
     The following steps are performed:
 
         - For all strain gauges, set the voltage ranges and resolution index (from the setup), and enable its
           channel,
+        - Set the stream resolution index override when provided,
         - Enable HK and metrics,
         - Make sure that the HK ends up in the folder, dedicated to the current observation, and that the filenames
           also refer to the current observation (since this function is a building block, it can only be run in the
@@ -853,6 +868,7 @@ def enable_all_sg_logging(setup: Setup = None) -> None:
 
     set_sg_runtime_settings(
         scan_rate=stream_setup.scan_rate,
+        stream_resolution_index=stream_resolution_index,
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=True,
@@ -871,7 +887,8 @@ def enable_sg_logging(
     neg_voltage_range,
     resolution_index: int,
     scan_rate: float,
-    setup: Setup,
+    setup: Setup = None,
+    stream_resolution_index: int | None = None,
 ) -> None:
     """Enables the logging for the given strain gauge.
 
@@ -893,6 +910,7 @@ def enable_sg_logging(
         resolution_index (int): Resolution index of the strain gauge [m].
         scan_rate (float): Scan rate of the strain gauge [Hz].
         setup (Setup): Setup.
+        stream_resolution_index (int | None): Stream-wide resolution index [m].
     """
 
     setup = setup or load_setup()
@@ -924,6 +942,7 @@ def enable_sg_logging(
 
     set_sg_runtime_settings(
         scan_rate=scan_rate,
+        stream_resolution_index=stream_resolution_index,
         resync_interval_s=stream_setup.resync_interval_s,
         buffer_size=stream_setup.buffer_size,
         csv_enabled=True,

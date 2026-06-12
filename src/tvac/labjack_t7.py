@@ -39,7 +39,9 @@ class LabJackT7Logger:
         Voltage range for negative reference channels. Scalar or
         per-channel list. Default 10.0 V.
     resolution_index : int | list[int]
-        Stream resolution index. Scalar or per-channel list. 0 = auto.
+        Analog-input resolution index. Scalar or per-channel list. 0 = auto.
+    stream_resolution_index : int
+        Stream-wide resolution index. 0 = auto.
     resync_interval_s : int
         Seconds between host-clock re-anchor points to limit drift.
     buffer_size : int
@@ -69,6 +71,7 @@ class LabJackT7Logger:
         voltage_range: float | list[float] = 0.1,
         neg_voltage_range: float | list[float] = 10.0,
         resolution_index: int | list[int] = 0,
+        stream_resolution_index: int = 0,
         resync_interval_s: int = 60,
         buffer_size: int = 32768,
     ):
@@ -76,6 +79,7 @@ class LabJackT7Logger:
         self.scan_rate = scan_rate
         self.resync_interval_s = resync_interval_s
         self.buffer_size = buffer_size
+        self.stream_resolution_index = int(stream_resolution_index)
 
         n = len(ain_channels)
         self.voltage_ranges = self._expand(voltage_range, n, "voltage_range")
@@ -212,7 +216,7 @@ class LabJackT7Logger:
         values += [
             0,  # free-running
             0,  # internal clock
-            0,  # stream-level resolution (per-channel set above)
+            self.stream_resolution_index,
             0.0,  # auto settling (float < 1)
             0,  # continuous
             self.buffer_size,
