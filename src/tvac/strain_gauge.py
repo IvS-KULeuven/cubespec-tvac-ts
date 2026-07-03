@@ -307,9 +307,7 @@ def set_sg_runtime_settings(
         )
     if stream_resolution_index is not None:
         _runtime_overrides["stream"]["stream_resolution_index"] = (
-            _coerce_non_negative_int(
-                stream_resolution_index, "stream_resolution_index"
-            )
+            _coerce_non_negative_int(stream_resolution_index, "stream_resolution_index")
         )
     if resync_interval_s is not None:
         _runtime_overrides["stream"]["resync_interval_s"] = _coerce_positive_int(

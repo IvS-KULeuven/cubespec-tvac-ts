@@ -489,14 +489,9 @@ def sine_sweep(
 
     time.sleep(2 * float(sweep_time))
 
-    # Stop the wave generation + reset the wave generators
+    # Stop the wave generation + reset the wave generators + disable the logging of the strain gauges
 
     stop_wave_generation_and_reset(setup=setup)
-
-    # Disable the logging of the strain gauges
-    # We don't explicitly disable the channels but settle for the default behaviour from the setup
-
-    disable_sg_logging(setup=setup)
 
 
 @building_block
@@ -652,14 +647,9 @@ def ramp(
     start_ramp(amplitude=amplitude, period=period, piezo_list=piezo_list, setup=setup)
 
     # Sleeping for the duration of each ramp has already been included in `start_ramp`
-    # Stop the wave generation + reset the wave generators
+    # Stop the wave generation + reset the wave generators + disable the logging of the strain gauges
 
     stop_wave_generation_and_reset(setup=setup)
-
-    # Disable the logging of the strain gauges
-    # We don't explicitly disable the channels but settle for the default behaviour from the setup
-
-    disable_sg_logging(setup=setup)
 
 
 @building_block
@@ -829,19 +819,16 @@ def plateau(
     time.sleep(duration + 2 * edges)
     stop_signal_trigger()
 
-    # Stop the wave generation + reset the wave generators
+    # Stop the wave generation + reset the wave generators + disable the logging of the strain gauges
 
     stop_wave_generation_and_reset(setup=setup)
 
-    # Disable the logging of the strain gauges
-    # We don't explicitly disable the channels but settle for the default behaviour from the setup
-
-    disable_sg_logging(setup=setup)
-
 
 @building_block
-def stop_wave_generation_and_reset(setup: Setup = None):
-    """Switches off the wave generators.
+def stop_wave_generation_and_reset(setup: Setup | None = None):
+    """Switches off the wave generators and stops the logging of the LabJack.
+
+    The wave generators are reset to their default settings and the logging of the LabJack is stopped.
 
     Args:
         setup (Setup): Setup from which to extract the information from the wave generators.
@@ -871,6 +858,11 @@ def stop_wave_generation_and_reset(setup: Setup = None):
             # (e.g. no frequency sweep, no external trigger, etc.)
 
         awg.reset()
+
+    # Disable the logging of the strain gauges (see https://github.com/IvS-KULeuven/cubespec-tvac-ts/issues/105)
+    # We don't explicitly disable the channels but settle for the default behaviour from the setup
+
+    disable_sg_logging(setup=setup)
 
 
 def start_signal_trigger() -> None:
