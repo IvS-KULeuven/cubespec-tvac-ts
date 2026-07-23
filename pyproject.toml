@@ -1,6 +1,6 @@
 [project]
 name = "cubespec-tvac-ts"
-version = "0.0.1"
+version = "0.1.2"
 description = "CubeSpec TVAC testing at KU Leuven"
 authors = [
     {name = "IvS KU Leuven"}
