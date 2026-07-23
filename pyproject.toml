@@ -25,6 +25,7 @@ dependencies = [
     "keithley-tempcontrol",
     "kikusui-power-supply",
     "aim-tti-awg",
+    "ivs-tvac",
     "gui-executor",
     "labjack-ljm",
     "matplotlib",
