@@ -11,14 +11,19 @@ nothing yet
 
 ---
 
+[0.1.2] - 2026-07-23
+
+- bumped version in `pyproject.toml`
+
 [0.1.1] - 2026-07-23
 
 - Added `ivs-tvac` to monitor and control the Thermal Vacuum chamber @ IvS
 - Added this CHANGELOG
 
-[0.1.0] - 2026-07-23
+0.1.0 - 2026-07-23
 
 - Last commit before we started the CHANGELOG
 
-[Unreleased]: https://github.com/IvS-KULeuven/cgse/compare/0.1.0...HEAD
-[0.1.0]: https://github.com/IvS-KULeuven/cgse/compare/0.1.0...0.2.0
+[Unreleased]: https://github.com/IvS-KULeuven/cgse/compare/0.1.2...HEAD
+[0.1.2]: https://github.com/IvS-KULeuven/cgse/compare/0.1.0...0.1.2
+[0.1.1]: https://github.com/IvS-KULeuven/cgse/compare/0.1.0...0.1.1
